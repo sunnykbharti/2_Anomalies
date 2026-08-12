@@ -1,4 +1,4 @@
-# 🏥 Virtual Village Clinic (SevaHealth AI)
+# 🏥 Virtual Village Clinic (NIRMAYA)
 
 > **Transforming rural health centers into AI-assisted, doctor-connected virtual clinics with multi-lingual triage, offline SMS fallback, and community outbreak detection.**
 
