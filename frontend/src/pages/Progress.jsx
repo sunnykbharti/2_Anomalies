@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import {
   Activity,
   ArrowDown,
@@ -15,6 +16,7 @@ import {
 } from "lucide-react";
 
 const Progress = () => {
+  const navigate = useNavigate();
   // ============================================================
   // SAMPLE DATA
   // Later you can fetch this from your Flask backend using axios
@@ -631,7 +633,10 @@ const Progress = () => {
             </div>
 
 
-            <button className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 px-5 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-500/10 transition hover:-translate-y-0.5">
+            <button
+              onClick={() => navigate("/pose-analysis")}
+              className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 px-5 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-500/10 transition hover:-translate-y-0.5"
+            >
 
               Start Workout
 

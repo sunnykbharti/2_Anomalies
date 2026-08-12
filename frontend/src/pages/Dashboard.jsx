@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import {
   Activity,
   Target,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   // Dummy data — later replace with backend API data
   const stats = [
     {
@@ -115,7 +117,10 @@ const Dashboard = () => {
             </p>
           </div>
 
-          <button className="group flex items-center justify-center gap-2 rounded-xl bg-cyan-500 px-6 py-3 font-bold text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:-translate-y-1 hover:bg-cyan-400">
+          <button
+            onClick={() => navigate("/pose-analysis")}
+            className="group flex items-center justify-center gap-2 rounded-xl bg-cyan-500 px-6 py-3 font-bold text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:-translate-y-1 hover:bg-cyan-400"
+          >
             <Play size={18} fill="currentColor" />
             Start Workout
             <ArrowUpRight
@@ -559,7 +564,10 @@ const Dashboard = () => {
 
             </div>
 
-            <button className="flex items-center gap-2 rounded-xl bg-cyan-500 px-6 py-3 font-bold text-slate-950 transition hover:-translate-y-1 hover:bg-cyan-400">
+            <button
+              onClick={() => navigate("/pose-analysis")}
+              className="flex items-center gap-2 rounded-xl bg-cyan-500 px-6 py-3 font-bold text-slate-950 transition hover:-translate-y-1 hover:bg-cyan-400"
+            >
               <Play size={18} fill="currentColor" />
               Start Pose Analysis
             </button>

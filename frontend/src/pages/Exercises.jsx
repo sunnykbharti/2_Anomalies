@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Activity,
   ArrowRight,
@@ -570,6 +571,7 @@ const ExerciseCard = ({ exercise, onOpen }) => {
 ================================================================ */
 
 const ExerciseModal = ({ exercise, onClose }) => {
+  const navigate = useNavigate();
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md"
@@ -658,17 +660,25 @@ const ExerciseModal = ({ exercise, onClose }) => {
             </div>
           </div>
 
-          {/* Video */}
+          {/* Video & Start Analysis */}
 
-          <div className="mt-8">
+          <div className="mt-8 grid gap-4 sm:grid-cols-2">
+            <button
+              onClick={() => navigate("/pose-analysis")}
+              className="flex items-center justify-center gap-3 rounded-2xl bg-cyan-400 py-4 font-bold text-slate-950 shadow-xl shadow-cyan-500/20 transition hover:-translate-y-1 hover:bg-cyan-300"
+            >
+              <Sparkles size={19} />
+              Start AI Pose Analysis
+            </button>
+
             <a
               href={exercise.video}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 py-4 font-bold text-slate-950 shadow-xl shadow-cyan-500/20 transition hover:-translate-y-1"
+              className="flex items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] py-4 font-bold text-slate-200 shadow-xl transition hover:-translate-y-1 hover:bg-white/[0.08]"
             >
               <Play size={19} fill="currentColor" />
-              Watch Demonstration
+              Watch Demo
             </a>
           </div>
 
