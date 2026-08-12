@@ -50,3 +50,15 @@ Rural health centers often operate with trained health workers but face a severe
 ---
 
 ## 🏗️ System Workflow Architecture
+
+
+
+
+
+
+
+
+
+
+🛡️ Medical Disclaimer
+This software is designed solely as a clinical decision-support co-pilot for trained health workers operating under doctor supervision. It does not provide independent medical diagnoses or replace licensed physicians.
