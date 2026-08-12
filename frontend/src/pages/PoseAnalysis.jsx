@@ -1805,7 +1805,7 @@ const PoseAnalysis = () => {
       setLoading(true);
 
       const response = await api.post(
-        "/pose/start",
+        "/pose/analyze_frame",
         {
           exercise: selectedExercise,
         }
