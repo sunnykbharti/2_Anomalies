@@ -40,7 +40,7 @@ class LungeAnalyzer:
         self.incorrect_repetitions = 0
         self.current_rep_errors = set()
         self.min_knee_this_rep = 180.0
-        self.last_rep_feedback = "Step forward into a lunge"
+        self.last_rep_feedback = "आगे कदम रखकर लंज करें"
         self.rep_log = []
 
     def process_frame(self, frame):
@@ -49,7 +49,7 @@ class LungeAnalyzer:
         output_rgb = results[0].plot()
         output_bgr = cv2.cvtColor(output_rgb, cv2.COLOR_RGB2BGR)
 
-        feedback = "No person detected"
+        feedback = "कोई व्यक्ति नहीं दिखा"
         min_knee = None
         keypoint_data = results[0].keypoints.data
 
@@ -86,7 +86,7 @@ class LungeAnalyzer:
 
                 feedback = self._run_state_machine(min_knee, frame_errors)
             else:
-                feedback = "Show full body in side view"
+                feedback = "साइड व्यू में पूरा शरीर दिखाएं"
 
         return output_bgr, {
             "stage": self.stage,
@@ -105,8 +105,8 @@ class LungeAnalyzer:
                 self.min_knee_this_rep = min_knee_angle
 
             if "leaning_forward" in frame_errors:
-                return "Keep your chest upright while stepping"
-            return self.last_rep_feedback if self.total_repetitions else "Step into lunge"
+                return "छाती सीधी रखें"
+            return self.last_rep_feedback if self.total_repetitions else "लंज करें"
 
         # lunging
         self.min_knee_this_rep = min(self.min_knee_this_rep, min_knee_angle)
@@ -120,10 +120,10 @@ class LungeAnalyzer:
             is_correct = len(self.current_rep_errors) == 0
             if is_correct:
                 self.correct_repetitions += 1
-                self.last_rep_feedback = "Last rep: Excellent lunge!"
+                self.last_rep_feedback = "पिछला रेप: बहुत अच्छा लंज!"
             else:
                 self.incorrect_repetitions += 1
-                self.last_rep_feedback = "Last rep: " + self._error_msg(self.current_rep_errors)
+                self.last_rep_feedback = "पिछला रेप: " + self._error_msg(self.current_rep_errors)
 
             self.rep_log.append({
                 "rep_number": self.total_repetitions,
@@ -138,16 +138,16 @@ class LungeAnalyzer:
             return self.last_rep_feedback
 
         if "leaning_forward" in frame_errors:
-            return "Keep upper body upright"
-        return "Good lunge depth - push back up!"
+            return "ऊपरी शरीर सीधा रखें"
+        return "अच्छी गहराई - वापस ऊपर उठें!"
 
     @staticmethod
     def _error_msg(errors):
         if "leaning_forward" in errors:
-            return "Keep torso upright"
+            return "धड़ सीधा रखें"
         if "shallow_lunge" in errors:
-            return "Drop back knee closer to ground"
-        return "Good repetition"
+            return "पिछला घुटना ज़मीन के नज़दीक लाएं"
+        return "अच्छा रेप"
 
     def session_summary(self):
         accuracy = round(100 * self.correct_repetitions / self.total_repetitions, 1) if self.total_repetitions else 0

@@ -171,9 +171,9 @@ def stop_exercise():
 def _build_text_summary(summary):
     errors_flat = [e for rep in summary.get("rep_log", []) for e in rep.get("errors", [])]
     if not errors_flat:
-        return f"Solid session! Completed {summary['correct_reps']} reps/holds with good form alignment."
+        return f"शानदार सत्र! {summary['correct_reps']} रेप्स सही फॉर्म के साथ पूरे किए।"
     common = max(set(errors_flat), key=errors_flat.count)
-    return f"{summary['correct_reps']}/{summary['total_reps']} correct. Recurring form suggestion: {common.replace('_', ' ')}."
+    return f"{summary['correct_reps']}/{summary['total_reps']} सही। बार-बार आने वाली समस्या: {common.replace('_', ' ')}।"
 
 
 @movement_bp.route('/session/<int:session_id>', methods=['GET'])

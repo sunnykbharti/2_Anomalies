@@ -57,7 +57,7 @@ class YogaAnalyzer:
         self.completed_holds = 0
         self.total_hold_time = 0.0
         self.current_hold_duration = 0.0
-        self.last_feedback = "Get into starting posture"
+        self.last_feedback = "शुरूआती पोज़ में आएं"
         self.rep_log = []
 
     def process_frame(self, frame):
@@ -66,7 +66,7 @@ class YogaAnalyzer:
         output_rgb = results[0].plot()
         output_bgr = cv2.cvtColor(output_rgb, cv2.COLOR_RGB2BGR)
 
-        feedback = "No person detected"
+        feedback = "कोई व्यक्ति नहीं दिखा"
         is_good = False
         keypoint_data = results[0].keypoints.data
 
@@ -127,34 +127,34 @@ class YogaAnalyzer:
     def _check_tree(self, person):
         idx = [LEFT_HIP, RIGHT_HIP, LEFT_KNEE, RIGHT_KNEE, LEFT_ANKLE, RIGHT_ANKLE]
         if not self._reliable(person, idx, min_count=4):
-            return "Show lower body clearly"
+            return "निचला शरीर स्पष्ट दिखाएं"
 
         l_ank_y, r_ank_y = person[LEFT_ANKLE][1], person[RIGHT_ANKLE][1]
         lifted_left = l_ank_y < r_ank_y - 20
         lifted_right = r_ank_y < l_ank_y - 20
 
         if not lifted_left and not lifted_right:
-            return "Lift one foot and place on ankle/calf"
+            return "एक पैर उठाकर टखने पर रखें"
 
-        return "GOOD: Tree Pose balance"
+        return "GOOD: वृक्षासन संतुलन अच्छा है"
 
     def _check_tadasana(self, person):
         idx = [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_HIP, RIGHT_HIP, LEFT_ANKLE, RIGHT_ANKLE]
         if not self._reliable(person, idx, min_count=4):
-            return "Show full body standing straight"
+            return "सीधे खड़े होकर पूरा शरीर दिखाएं"
 
         sh_width = distance(person[LEFT_SHOULDER], person[RIGHT_SHOULDER])
         ank_width = distance(person[LEFT_ANKLE], person[RIGHT_ANKLE])
 
         if ank_width > sh_width * 1.8:
-            return "Bring feet closer together"
+            return "पैरों को पास लाएं"
 
-        return "GOOD: Tadasana alignment"
+        return "GOOD: ताड़ासन सही है"
 
     def _check_warrior_two(self, person):
         idx = [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_WRIST, RIGHT_WRIST, LEFT_HIP, RIGHT_HIP, LEFT_KNEE, RIGHT_KNEE, LEFT_ANKLE, RIGHT_ANKLE]
         if not self._reliable(person, idx, min_count=6):
-            return "Extend arms and widen stance"
+            return "बाहें फैलाएं और पैर चौड़ा करें"
 
         l_knee_angle = calculate_angle(person[LEFT_HIP][:2], person[LEFT_KNEE][:2], person[LEFT_ANKLE][:2])
         r_knee_angle = calculate_angle(person[RIGHT_HIP][:2], person[RIGHT_KNEE][:2], person[RIGHT_ANKLE][:2])
@@ -163,50 +163,50 @@ class YogaAnalyzer:
         sh_w = distance(person[LEFT_SHOULDER], person[RIGHT_SHOULDER])
 
         if hands_w < sh_w * 1.6:
-            return "Extend both arms parallel to floor"
+            return "दोनों बाहें ज़मीन के समानतर फैलाएं"
         if min(l_knee_angle, r_knee_angle) > 140:
-            return "Bend your front knee"
+            return "सामने वाला घुटना मोड़ें"
 
-        return "GOOD: Warrior II alignment"
+        return "GOOD: वीरभद्रासन सही है"
 
     def _check_triangle(self, person):
         idx = [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_HIP, RIGHT_HIP, LEFT_KNEE, RIGHT_KNEE, LEFT_ANKLE, RIGHT_ANKLE]
         if not self._reliable(person, idx, min_count=5):
-            return "Show full body in wide triangle stance"
+            return "त्रिकोणासन में पूरा शरीर दिखाएं"
 
         l_leg = calculate_angle(person[LEFT_HIP][:2], person[LEFT_KNEE][:2], person[LEFT_ANKLE][:2])
         r_leg = calculate_angle(person[RIGHT_HIP][:2], person[RIGHT_KNEE][:2], person[RIGHT_ANKLE][:2])
 
         if min(l_leg, r_leg) < 140:
-            return "Keep both legs straight and extended"
+            return "दोनों पैर सीधे और फैले हुए रखें"
 
-        return "GOOD: Triangle Pose alignment"
+        return "GOOD: त्रिकोणासन सही है"
 
     def _check_downward_dog(self, person):
         idx = [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_HIP, RIGHT_HIP, LEFT_ANKLE, RIGHT_ANKLE]
         if not self._reliable(person, idx, min_count=4):
-            return "Show shoulders, hips, and ankles"
+            return "कंधे, कूल्हे और टखने दिखाएं"
 
         sh_c = midpoint(person[LEFT_SHOULDER], person[RIGHT_SHOULDER])
         hip_c = midpoint(person[LEFT_HIP], person[RIGHT_HIP])
 
         if hip_c[1] >= sh_c[1]:
-            return "Lift your hips high into an inverted V"
+            return "कूल्हे ऊपर उठाकर उल्टा V बनाएं"
 
-        return "GOOD: Downward Dog alignment"
+        return "GOOD: अधोमुख श्वानासन सही है"
 
     def _check_cobra(self, person):
         idx = [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_HIP, RIGHT_HIP, LEFT_ELBOW, RIGHT_ELBOW]
         if not self._reliable(person, idx, min_count=4):
-            return "Show upper body on mat"
+            return "मैट पर ऊपरी शरीर दिखाएं"
 
         sh_c = midpoint(person[LEFT_SHOULDER], person[RIGHT_SHOULDER])
         hip_c = midpoint(person[LEFT_HIP], person[RIGHT_HIP])
 
         if abs(hip_c[1] - sh_c[1]) < 25:
-            return "Lift chest gently upward"
+            return "छाती धीरे से ऊपर उठाएं"
 
-        return "GOOD: Cobra Pose alignment"
+        return "GOOD: भुजंगासन सही है"
 
     def session_summary(self):
         return {

@@ -50,7 +50,7 @@ class SuryaAnalyzer:
         output_rgb = results[0].plot()
         output_bgr = cv2.cvtColor(output_rgb, cv2.COLOR_RGB2BGR)
 
-        feedback = "No person detected"
+        feedback = "कोई व्यक्ति नहीं दिखा"
         keypoint_data = results[0].keypoints.data
 
         if len(keypoint_data) > 0:
@@ -92,11 +92,11 @@ class SuryaAnalyzer:
                             "errors": [],
                             "min_angle": round(float(spine_angle), 1),
                         })
-                        feedback = "GOOD: Transited to Hastapadasana (Forward Fold)"
+                        feedback = "GOOD: हस्तपादासन में आ गए"
                     elif hands_near_chest:
-                        feedback = "GOOD: Pranamasana (Prayer Pose) posture"
+                        feedback = "GOOD: प्रणामासन की मुद्रा सही है"
                     else:
-                        feedback = "Bring hands to chest center for Pranamasana"
+                        feedback = "प्रणामासन के लिए हाथ छाती के बीच लाएं"
                 else: # FORWARD_FOLD_POSE
                     if hands_near_chest and spine_angle > 145:
                         self.current_pose = PRAYER_POSE
@@ -108,13 +108,13 @@ class SuryaAnalyzer:
                             "errors": [],
                             "min_angle": round(float(spine_angle), 1),
                         })
-                        feedback = "GOOD: Returned to Pranamasana (Prayer Pose)"
+                        feedback = "GOOD: प्रणामासन में वापस आ गए"
                     elif hands_near_feet:
-                        feedback = "GOOD: Hastapadasana deep forward bend"
+                        feedback = "GOOD: हस्तपादासन गहरा आगे झुकाव"
                     else:
-                        feedback = "Bend forward keeping legs extended"
+                        feedback = "पैर सीधे रखकर आगे झुकें"
             else:
-                feedback = "Position full body in camera frame"
+                feedback = "पूरा शरीर कैमरे में दिखाएं"
 
         return output_bgr, {
             "stage": self.current_pose,

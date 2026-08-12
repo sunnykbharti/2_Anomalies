@@ -48,7 +48,7 @@ class PushupAnalyzer:
         self.incorrect_repetitions = 0
         self.current_rep_errors = set()
         self.min_elbow_this_rep = 180.0
-        self.last_rep_feedback = "Get into plank position"
+        self.last_rep_feedback = "प्लैंक पोज़िशन में आएं"
         self.rep_log = []
 
     def process_frame(self, frame):
@@ -57,7 +57,7 @@ class PushupAnalyzer:
         output_rgb = results[0].plot()
         output_bgr = cv2.cvtColor(output_rgb, cv2.COLOR_RGB2BGR)
 
-        feedback = "No person detected"
+        feedback = "कोई व्यक्ति नहीं दिखा"
         avg_elbow = None
         avg_body = None
         keypoint_data = results[0].keypoints.data
@@ -111,7 +111,7 @@ class PushupAnalyzer:
 
                 feedback = self._run_state_machine(avg_elbow, avg_body, frame_errors)
             else:
-                feedback = "Show full body in side view"
+                feedback = "साइड व्यू में पूरा शरीर दिखाएं"
 
         return output_bgr, {
             "stage": self.pushup_stage,
@@ -131,10 +131,10 @@ class PushupAnalyzer:
                 self.min_elbow_this_rep = elbow_angle
 
             if "hips_sagging" in frame_errors:
-                return "Keep your hips up - don't sag"
+                return "कूल्हे ऊपर रखें - झुकने न दें"
             if "hips_piked" in frame_errors:
-                return "Lower your hips - body straight"
-            return self.last_rep_feedback if self.total_repetitions else "Lower your chest to push up"
+                return "कूल्हे नीचे लाएं - शरीर सीधा रखें"
+            return self.last_rep_feedback if self.total_repetitions else "छाती नीचे लाकर पुश-अप करें"
 
         # down / moving up
         self.min_elbow_this_rep = min(self.min_elbow_this_rep, elbow_angle)
@@ -148,10 +148,10 @@ class PushupAnalyzer:
             is_correct = len(self.current_rep_errors) == 0
             if is_correct:
                 self.correct_repetitions += 1
-                self.last_rep_feedback = "Last rep: Good push-up!"
+                self.last_rep_feedback = "पिछला रेप: बहुत अच्छा पुश-अप!"
             else:
                 self.incorrect_repetitions += 1
-                self.last_rep_feedback = "Last rep: " + self._error_msg(self.current_rep_errors)
+                self.last_rep_feedback = "पिछला रेप: " + self._error_msg(self.current_rep_errors)
 
             self.rep_log.append({
                 "rep_number": self.total_repetitions,
@@ -166,20 +166,20 @@ class PushupAnalyzer:
             return self.last_rep_feedback
 
         if "hips_sagging" in frame_errors:
-            return "Engage core - hips are sagging"
+            return "कोर टाइट रखें - कूल्हे झुक रहे हैं"
         if "hips_piked" in frame_errors:
-            return "Keep spine straight"
-        return "Good depth - push up!"
+            return "रीढ़ सीधी रखें"
+        return "अच्छी गहराई - ऊपर उठें!"
 
     @staticmethod
     def _error_msg(errors):
         if "hips_sagging" in errors:
-            return "Keep hips aligned with back"
+            return "कूल्हे पीठ के साथ सीध में रखें"
         if "hips_piked" in errors:
-            return "Avoid sticking hips up"
+            return "कूल्हे ऊपर न उठाएं"
         if "shallow_pushup" in errors:
-            return "Go lower on push-up"
-        return "Good repetition"
+            return "पुश-अप में और नीचे जाएं"
+        return "अच्छा रेप"
 
     def session_summary(self):
         accuracy = round(100 * self.correct_repetitions / self.total_repetitions, 1) if self.total_repetitions else 0

@@ -44,7 +44,7 @@ class PlankAnalyzer:
         output_rgb = results[0].plot()
         output_bgr = cv2.cvtColor(output_rgb, cv2.COLOR_RGB2BGR)
 
-        feedback = "No person detected"
+        feedback = "कोई व्यक्ति नहीं दिखा"
         body_angle = None
         is_good = False
 
@@ -68,13 +68,13 @@ class PlankAnalyzer:
 
                 if body_angle >= BODY_STRAIGHT_THRESHOLD:
                     is_good = True
-                    feedback = f"GOOD: Perfect Plank Posture ({body_angle:.0f}°)"
+                    feedback = f"GOOD: पर्फेक्ट प्लैंक ({body_angle:.0f}°)"
                 else:
                     expected_hip_y = (sh[1] + ank[1]) / 2.0
                     if hip[1] > expected_hip_y:
-                        feedback = "Engage core - hips are sagging"
+                        feedback = "कोर टाइट रखें - कूल्हे झुक रहे हैं"
                     else:
-                        feedback = "Lower your hips - body straight"
+                        feedback = "कूल्हे नीचे लाएं - शरीर सीधा रखें"
 
                 if is_good:
                     if self.hold_start_time is None:
@@ -95,7 +95,7 @@ class PlankAnalyzer:
                         self.hold_start_time = None
                         self.current_hold_seconds = 0.0
             else:
-                feedback = "Show full body side view in plank"
+                feedback = "प्लैंक में साइड व्यू में पूरा शरीर दिखाएं"
 
         return output_bgr, {
             "stage": "Plank Hold",

@@ -54,7 +54,7 @@ class SquatAnalyzer:
         self.incorrect_repetitions = 0
         self.current_rep_errors = set()
         self.min_angle_this_rep = 180.0
-        self.last_rep_feedback = "Stand straight to begin squats"
+        self.last_rep_feedback = "स्क्वाट शुरू करने के लिए सीधे खड़े हों"
         self.rep_log = []
 
     def process_frame(self, frame):
@@ -63,7 +63,7 @@ class SquatAnalyzer:
         output_rgb = results[0].plot()
         output_bgr = cv2.cvtColor(output_rgb, cv2.COLOR_RGB2BGR)
 
-        feedback = "No person detected"
+        feedback = "कोई व्यक्ति नहीं दिखा"
         knee_angle = None
         keypoint_data = results[0].keypoints.data
 
@@ -112,7 +112,7 @@ class SquatAnalyzer:
 
                 feedback = self._run_state_machine(knee_angle, frame_errors)
             else:
-                feedback = "Step back so legs are visible"
+                feedback = "पीछे हटें ताकि पैर दिखाई दें"
 
         return output_bgr, {
             "stage": self.squat_stage,
@@ -129,7 +129,7 @@ class SquatAnalyzer:
                 self.squat_stage = "squatting"
                 self.current_rep_errors = set()
                 self.min_angle_this_rep = angle
-            return self.last_rep_feedback if self.total_repetitions else "Squat down"
+            return self.last_rep_feedback if self.total_repetitions else "नीचे बैठें"
 
         # squatting
         self.min_angle_this_rep = min(self.min_angle_this_rep, angle)
@@ -143,10 +143,10 @@ class SquatAnalyzer:
             is_correct = len(self.current_rep_errors) == 0
             if is_correct:
                 self.correct_repetitions += 1
-                self.last_rep_feedback = "Last rep: Good squat form!"
+                self.last_rep_feedback = "पिछला रेप: बहुत अच्छा स्क्वाट!"
             else:
                 self.incorrect_repetitions += 1
-                self.last_rep_feedback = "Last rep: " + self._error_msg(self.current_rep_errors)
+                self.last_rep_feedback = "पिछला रेप: " + self._error_msg(self.current_rep_errors)
 
             self.rep_log.append({
                 "rep_number": self.total_repetitions,
@@ -161,24 +161,24 @@ class SquatAnalyzer:
             return self.last_rep_feedback
 
         if "both_knees_inward" in frame_errors:
-            return "Keep knees pushed outward"
+            return "दोनों घुटने बाहर की तरफ रखें"
         if "left_knee_inward" in frame_errors:
-            return "Push left knee outward"
+            return "बायां घुटना बाहर की तरफ धकेलें"
         if "right_knee_inward" in frame_errors:
-            return "Push right knee outward"
-        return "Good depth - push through heels!"
+            return "दायां घुटना बाहर की तरफ धकेलें"
+        return "अच्छी गहराई - एड़ियों से ऊपर उठें!"
 
     @staticmethod
     def _error_msg(errors):
         if "both_knees_inward" in errors:
-            return "Keep both knees aligned"
+            return "दोनों घुटने सीध में रखें"
         if "left_knee_inward" in errors:
-            return "Move left knee outward"
+            return "बायां घुटना बाहर ले जाएं"
         if "right_knee_inward" in errors:
-            return "Move right knee outward"
+            return "दायां घुटना बाहर ले जाएं"
         if "shallow_squat" in errors:
-            return "Squat a bit deeper"
-        return "Good repetition"
+            return "थोड़ा और गहरा बैठें"
+        return "अच्छा रेप"
 
     def session_summary(self):
         accuracy = round(100 * self.correct_repetitions / self.total_repetitions, 1) if self.total_repetitions else 0

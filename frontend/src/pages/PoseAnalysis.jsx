@@ -1543,6 +1543,8 @@ import {
   Sparkles,
   Target,
   Video,
+  Volume2,
+  VolumeX,
   XCircle,
   Zap,
 } from "lucide-react";
@@ -1583,7 +1585,7 @@ const PoseAnalysis = () => {
     useState(0);
 
   const [feedback, setFeedback] = useState(
-    "Position yourself in front of the camera."
+    "कैमरे के सामने खड़े हों।"
   );
 
   const [feedbackType, setFeedbackType] =
@@ -1598,6 +1600,50 @@ const PoseAnalysis = () => {
   // The skeleton-annotated JPEG returned by the backend each frame.
   const [annotatedFrame, setAnnotatedFrame] =
     useState(null);
+
+  // Audio voice feedback state
+  const [speechEnabled, setSpeechEnabled] = useState(true);
+  const lastSpokenRef = useRef({ text: "", time: 0 });
+
+  const speakFeedback = (text) => {
+    if (!speechEnabled || !("speechSynthesis" in window) || !text) return;
+
+    const cleanText = text.split("|")[0].replace(/^GOOD:\s*/i, "").trim();
+    if (!cleanText || cleanText === "कोई व्यक्ति नहीं दिखा") return;
+
+    const now = Date.now();
+    const isRepAnnouncement = cleanText.includes("पिछला रेप");
+    if (
+      !isRepAnnouncement &&
+      cleanText === lastSpokenRef.current.text &&
+      now - lastSpokenRef.current.time < 4000
+    ) {
+      return;
+    }
+
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.lang = "hi-IN";
+      utterance.rate = 0.85;
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
+
+      // Try to find a Hindi voice
+      const voices = window.speechSynthesis.getVoices();
+      const hindiVoice = voices.find(
+        (v) => v.lang === "hi-IN" || v.lang.startsWith("hi")
+      );
+      if (hindiVoice) {
+        utterance.voice = hindiVoice;
+      }
+
+      lastSpokenRef.current = { text: cleanText, time: now };
+      window.speechSynthesis.speak(utterance);
+    } catch (err) {
+      console.warn("TTS error:", err);
+    }
+  };
 
   // ============================================================
   // EXERCISES
@@ -1684,7 +1730,7 @@ const PoseAnalysis = () => {
       setCameraActive(true);
 
       setFeedback(
-        "Camera ready. Position your full body inside the frame."
+        "कैमरा तैयार। अपना पूरा शरीर फ्रेम में रखें।"
       );
 
       setFeedbackType("success");
@@ -1696,7 +1742,7 @@ const PoseAnalysis = () => {
       );
 
       setFeedback(
-        "Camera access was denied or unavailable."
+        "कैमरा एक्सेस नहीं मिला।"
       );
 
       setFeedbackType("error");
@@ -1765,6 +1811,7 @@ const PoseAnalysis = () => {
 
       if (metrics.feedback) {
         setFeedback(metrics.feedback);
+        speakFeedback(metrics.feedback);
 
         const lower = metrics.feedback.toLowerCase();
         if (lower.includes("good") || lower.includes("correct")) {
@@ -1794,7 +1841,7 @@ const PoseAnalysis = () => {
   const startAnalysis = async () => {
     if (!cameraActive) {
       setFeedback(
-        "Please start the camera first."
+        "पहले कैमरा चालू करें।"
       );
 
       setFeedbackType("error");
@@ -1825,7 +1872,7 @@ const PoseAnalysis = () => {
       setBodyStatus("Detecting");
 
       setFeedback(
-        "AI analysis started. Begin your movement."
+        "AI विश्लेषण शुरू। अपनी एक्सरसाइज शुरू करें।"
       );
 
       setFeedbackType("success");
@@ -1850,7 +1897,7 @@ const PoseAnalysis = () => {
 
       setAnalysisRunning(true);
       setBodyStatus("Detecting");
-      setFeedback("AI Pose Analysis active.");
+      setFeedback("AI पोज़ विश्लेषण चालू है।");
       setFeedbackType("success");
       captureIntervalRef.current = setInterval(
         captureAndAnalyzeFrame,
@@ -1994,7 +2041,7 @@ const PoseAnalysis = () => {
     setAnnotatedFrame(null);
 
     setFeedback(
-      "Position yourself in front of the camera."
+      "कैमरे के सामने खड़े हों।"
     );
 
     setFeedbackType("info");
@@ -2014,10 +2061,9 @@ const PoseAnalysis = () => {
     setSessionResult(null);
 
     setFeedback(
-      "Ready for " +
-        exercises.find(
+      exercises.find(
           (item) => item.id === exercise
-        )?.name
+        )?.name + " के लिए तैयार"
     );
 
     setFeedbackType("info");
@@ -2372,14 +2418,36 @@ const PoseAnalysis = () => {
               {cameraActive && (
                 <>
 
-                  {/* Top status */}
+                  {/* Top status & Voice toggle */}
 
-                  <div className="absolute left-5 top-5 flex items-center gap-2 rounded-full border border-white/10 bg-black/50 px-3 py-2 text-xs backdrop-blur-md">
+                  <div className="absolute left-5 top-5 flex items-center gap-3">
+                    <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/50 px-3 py-2 text-xs backdrop-blur-md">
+                      <div className="h-2 w-2 animate-pulse rounded-full bg-red-400" />
+                      LIVE
+                    </div>
 
-                    <div className="h-2 w-2 animate-pulse rounded-full bg-red-400" />
-
-                    LIVE
-
+                    <button
+                      onClick={() => {
+                        if (speechEnabled) {
+                          window.speechSynthesis.cancel();
+                        }
+                        setSpeechEnabled(!speechEnabled);
+                      }}
+                      className="flex items-center gap-1.5 rounded-full border border-white/10 bg-black/50 px-3 py-2 text-xs font-medium text-white backdrop-blur-md transition-all hover:bg-black/70"
+                      title={speechEnabled ? "Mute voice feedback" : "Enable voice feedback"}
+                    >
+                      {speechEnabled ? (
+                        <>
+                          <Volume2 size={13} className="text-cyan-400" />
+                          <span>Voice On</span>
+                        </>
+                      ) : (
+                        <>
+                          <VolumeX size={13} className="text-gray-400" />
+                          <span>Voice Off</span>
+                        </>
+                      )}
+                    </button>
                   </div>
 
 

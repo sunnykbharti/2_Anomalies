@@ -38,7 +38,7 @@ class PostureAnalyzer:
         output_rgb = results[0].plot()
         output_bgr = cv2.cvtColor(output_rgb, cv2.COLOR_RGB2BGR)
 
-        feedback = "No person detected"
+        feedback = "कोई व्यक्ति नहीं दिखा"
         score = 100
         keypoint_data = results[0].keypoints.data
 
@@ -69,23 +69,23 @@ class PostureAnalyzer:
 
                 issues = []
                 if lean_deg > MAX_TORSO_LEAN_DEGREES:
-                    issues.append("Slouching / Torso leaning")
+                    issues.append("झुकाव / धड़ झुक रहा है")
                     score -= 30
                 if shoulder_tilt > MAX_SHOULDER_TILT:
-                    issues.append("Uneven shoulders")
+                    issues.append("कंधे असमान हैं")
                     score -= 20
                 if abs(head_forward) > 55:
-                    issues.append("Forward head posture")
+                    issues.append("सिर आगे झुका हुआ है")
                     score -= 25
 
                 if not issues:
                     self.good_frames += 1
-                    feedback = f"GOOD: Excellent Posture (Score: {score}/100)"
+                    feedback = f"GOOD: बहुत अच्छी मुद्रा (Score: {score}/100)"
                 else:
                     self.bad_frames += 1
-                    feedback = "Posture issue: " + ", ".join(issues)
+                    feedback = "मुद्रा में समस्या: " + ", ".join(issues)
             else:
-                feedback = "Sit/stand upright in front of camera"
+                feedback = "कैमरे के सामने सीधे बैठें या खड़े हों"
 
         total_tracked = self.good_frames + self.bad_frames
         accuracy = round(100 * self.good_frames / total_tracked, 1) if total_tracked > 0 else 0.0
