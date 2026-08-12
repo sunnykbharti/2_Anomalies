@@ -2,6 +2,7 @@ import os
 from flask import Flask, jsonify, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from models import db, User
+from flask_jwt_extended import JWTManager
 from werkzeug.security import generate_password_hash
 from flask_jwt_extended import JWTManager
 # from flask_caching import Cache
@@ -10,9 +11,12 @@ from flask_jwt_extended import JWTManager
 from extension import cache
 
 
+
+
 # ============= Database configuration =========================
 
 app = Flask(__name__)
+jwt = JWTManager(app)
 
 jwt = JWTManager(app)
 # ============ Flask-caching setup configuration ================
