@@ -1,11 +1,15 @@
 import { useState } from "react";
-import api from "../api/Api"
+import { useNavigate } from "react-router-dom";
+import api from "../api/Api";
 
 const Login = () => {
   const [mobile, setMobile] = useState("");
   const [otp, setOtp] = useState("");
   const [showOtp, setShowOtp] = useState(false);
 
+  const navigate = useNavigate();
+
+  // Send mobile number to backend
   const handleMobileSubmit = async (e) => {
     e.preventDefault();
 
@@ -15,16 +19,15 @@ const Login = () => {
     }
 
     try {
-      const response = await api.post(
-        "/login",
-        {
-          mobile: mobile,
-        }
-      );
+      const response = await api.post("/login", {
+        mobile: mobile,
+      });
 
       console.log(response.data);
 
       setShowOtp(true);
+
+      alert("OTP sent successfully");
 
     } catch (error) {
       console.error("OTP sending failed:", error);
@@ -36,6 +39,7 @@ const Login = () => {
     }
   };
 
+  // Send OTP to backend for verification
   const handleOtpSubmit = async (e) => {
     e.preventDefault();
 
@@ -45,22 +49,23 @@ const Login = () => {
     }
 
     try {
-      const response = await api.post(
-        "/login",
-        {
-          mobile: mobile,
-          otp: otp,
-        }
-      );
+      const response = await api.post("/login", {
+        mobile: mobile,
+        otp: otp,
+      });
 
       console.log(response.data);
 
+      // JWT returned by Flask
+      const token = response.data.access_token;
+
+      // Store JWT
+      localStorage.setItem("token", token);
+
       alert("Login successful!");
 
-      // If Flask returns a JWT token:
-      // localStorage.setItem("token", response.data.access_token);
-
-      // navigate("/dashboard");
+      // Go to dashboard
+      navigate("/dashboard");
 
     } catch (error) {
       console.error("OTP verification failed:", error);
@@ -77,9 +82,7 @@ const Login = () => {
 
       <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
 
-        {/* Header */}
         <div className="text-center mb-8">
-
           <h1 className="text-3xl font-bold text-gray-800">
             Village Health
           </h1>
@@ -87,13 +90,10 @@ const Login = () => {
           <p className="text-gray-500 mt-2">
             Login to access your health center
           </p>
-
         </div>
-
 
         {!showOtp ? (
 
-          /* Mobile Number */
           <form onSubmit={handleMobileSubmit}>
 
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -122,10 +122,9 @@ const Login = () => {
 
             </div>
 
-
             <button
               type="submit"
-              className="w-full mt-6 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition"
+              className="w-full mt-6 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700"
             >
               Send OTP
             </button>
@@ -134,11 +133,9 @@ const Login = () => {
 
         ) : (
 
-          /* OTP */
           <form onSubmit={handleOtpSubmit}>
 
             <div className="text-center mb-6">
-
               <p className="text-gray-600">
                 OTP sent to
               </p>
@@ -146,14 +143,11 @@ const Login = () => {
               <p className="font-semibold text-gray-800">
                 +91 {mobile}
               </p>
-
             </div>
-
 
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Enter OTP
             </label>
-
 
             <input
               type="text"
@@ -171,14 +165,12 @@ const Login = () => {
               className="w-full px-4 py-3 border border-gray-300 rounded-lg text-center tracking-[0.5em] text-xl outline-none focus:ring-2 focus:ring-blue-500"
             />
 
-
             <button
               type="submit"
-              className="w-full mt-6 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition"
+              className="w-full mt-6 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700"
             >
               Verify OTP
             </button>
-
 
             <button
               type="button"
@@ -196,7 +188,6 @@ const Login = () => {
         )}
 
       </div>
-
     </div>
   );
 };
