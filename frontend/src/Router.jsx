@@ -7,6 +7,7 @@ import Login from "./pages/Login";
 import Log_Reg from "./layouts/Log_Reg";
 
 const Router = () => {
+
   const routes = createBrowserRouter([
     {
       path: "/",

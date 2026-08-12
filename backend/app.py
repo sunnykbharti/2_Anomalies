@@ -3,8 +3,8 @@ from flask import Flask, jsonify, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from models import db, User
 from werkzeug.security import generate_password_hash
-from flask_caching import Cache
-from celery import Celery
+# from flask_caching import Cache
+# from celery import Celery
 
 from extension import cache
 
@@ -15,13 +15,13 @@ app = Flask(__name__)
 
 # ============ Flask-caching setup configuration ================
 
-app.config['CACHE_TYPE'] = 'RedisCache'
-app.config['CACHE_REDIS_HOST'] = 'localhost'
-app.config['CACHE_REDIS_PORT'] = 6379
-app.config['CACHE_REDIS_DB'] = 0
-app.config['CACHE_DEFAULT_TIMEOUT'] = 300
+# app.config['CACHE_TYPE'] = 'RedisCache'
+# app.config['CACHE_REDIS_HOST'] = 'localhost'
+# app.config['CACHE_REDIS_PORT'] = 6379
+# app.config['CACHE_REDIS_DB'] = 0
+# app.config['CACHE_DEFAULT_TIMEOUT'] = 300
 
-cache.init_app(app)
+# cache.init_app(app)
 
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///auratrek.sqlite'
