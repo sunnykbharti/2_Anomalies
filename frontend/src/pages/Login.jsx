@@ -1,26 +1,25 @@
 import { useState } from "react";
+import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import api from "../api/Api";
 
 const Login = () => {
-  const [mobile, setMobile] = useState("");
-  const [otp, setOtp] = useState("");
   const [showOtp, setShowOtp] = useState(false);
 
   const navigate = useNavigate();
 
-  // Send mobile number to backend
-  const handleMobileSubmit = async (e) => {
-    e.preventDefault();
+  const {
+    register,
+    handleSubmit,
+    getValues,
+    formState: { errors },
+  } = useForm();
 
-    if (mobile.length !== 10) {
-      alert("Enter a valid 10-digit mobile number");
-      return;
-    }
-
+  // Send mobile number
+  const handleMobileSubmit = async (data) => {
     try {
       const response = await api.post("/login", {
-        mobile: mobile,
+        mobile: data.mobile,
       });
 
       console.log(response.data);
@@ -28,51 +27,39 @@ const Login = () => {
       setShowOtp(true);
 
       alert("OTP sent successfully");
-
     } catch (error) {
       console.error("OTP sending failed:", error);
 
       alert(
         error.response?.data?.message ||
-        "Failed to send OTP"
+          "Failed to send OTP"
       );
     }
   };
 
-  // Send OTP to backend for verification
-  const handleOtpSubmit = async (e) => {
-    e.preventDefault();
-
-    if (otp.length !== 6) {
-      alert("Enter a valid 6-digit OTP");
-      return;
-    }
-
+  // Verify OTP
+  const handleOtpSubmit = async (data) => {
     try {
       const response = await api.post("/login", {
-        mobile: mobile,
-        otp: otp,
+        mobile: getValues("mobile"),
+        otp: data.otp,
       });
 
       console.log(response.data);
 
-      // JWT returned by Flask
       const token = response.data.access_token;
 
-      // Store JWT
       localStorage.setItem("token", token);
 
       alert("Login successful!");
 
-      // Go to dashboard
       navigate("/dashboard");
-
     } catch (error) {
       console.error("OTP verification failed:", error);
 
       alert(
         error.response?.data?.message ||
-        "Invalid OTP"
+          "Invalid OTP"
       );
     }
   };
@@ -82,19 +69,23 @@ const Login = () => {
 
       <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
 
+        {/* Header */}
         <div className="text-center mb-8">
+
           <h1 className="text-3xl font-bold text-gray-800">
-            Village Health
+            Nirmaya
           </h1>
 
           <p className="text-gray-500 mt-2">
             Login to access your health center
           </p>
+
         </div>
 
         {!showOtp ? (
 
-          <form onSubmit={handleMobileSubmit}>
+          /* MOBILE FORM */
+          <form onSubmit={handleSubmit(handleMobileSubmit)}>
 
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Mobile Number
@@ -108,19 +99,25 @@ const Login = () => {
 
               <input
                 type="tel"
-                value={mobile}
-                onChange={(e) =>
-                  setMobile(
-                    e.target.value
-                      .replace(/\D/g, "")
-                      .slice(0, 10)
-                  )
-                }
                 placeholder="Enter mobile number"
+                {...register("mobile", {
+                  required: "Mobile number is required",
+                  pattern: {
+                    value: /^[0-9]{10}$/,
+                    message:
+                      "Enter a valid 10-digit mobile number",
+                  },
+                })}
                 className="w-full px-4 py-3 border border-gray-300 rounded-r-lg outline-none focus:ring-2 focus:ring-blue-500"
               />
 
             </div>
+
+            {errors.mobile && (
+              <p className="text-red-500 text-sm mt-2">
+                {errors.mobile.message}
+              </p>
+            )}
 
             <button
               type="submit"
@@ -133,16 +130,19 @@ const Login = () => {
 
         ) : (
 
-          <form onSubmit={handleOtpSubmit}>
+          /* OTP FORM */
+          <form onSubmit={handleSubmit(handleOtpSubmit)}>
 
             <div className="text-center mb-6">
+
               <p className="text-gray-600">
                 OTP sent to
               </p>
 
               <p className="font-semibold text-gray-800">
-                +91 {mobile}
+                +91 {getValues("mobile")}
               </p>
+
             </div>
 
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -153,17 +153,22 @@ const Login = () => {
               type="text"
               inputMode="numeric"
               maxLength={6}
-              value={otp}
-              onChange={(e) =>
-                setOtp(
-                  e.target.value
-                    .replace(/\D/g, "")
-                    .slice(0, 6)
-                )
-              }
               placeholder="Enter 6-digit OTP"
+              {...register("otp", {
+                required: "OTP is required",
+                pattern: {
+                  value: /^[0-9]{6}$/,
+                  message: "OTP must be 6 digits",
+                },
+              })}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg text-center tracking-[0.5em] text-xl outline-none focus:ring-2 focus:ring-blue-500"
             />
+
+            {errors.otp && (
+              <p className="text-red-500 text-sm mt-2">
+                {errors.otp.message}
+              </p>
+            )}
 
             <button
               type="submit"
@@ -174,10 +179,7 @@ const Login = () => {
 
             <button
               type="button"
-              onClick={() => {
-                setShowOtp(false);
-                setOtp("");
-              }}
+              onClick={() => setShowOtp(false)}
               className="w-full mt-3 text-blue-600"
             >
               Change Mobile Number
