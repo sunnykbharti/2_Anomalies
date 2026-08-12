@@ -1,3 +1,5 @@
+import { useNavigate } from "react-router-dom";
+
 import {
   Activity,
   Brain,
@@ -14,17 +16,42 @@ import {
 } from "lucide-react";
 
 const Home = () => {
+  const navigate = useNavigate();
+
+  // ============================================================
+  // START ANALYSIS
+  // ============================================================
+
+  const handleStartAnalysis = () => {
+    const token = localStorage.getItem("token");
+
+    if (token) {
+      navigate("/pose-analysis");
+    } else {
+      navigate("/login");
+    }
+  };
+
+  // ============================================================
+  // HOME
+  // ============================================================
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#020617] text-white">
 
-      {/* ================= BACKGROUND ================= */}
+      {/* ========================================================
+          BACKGROUND
+      ======================================================== */}
 
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
 
+        {/* Cyan glow */}
         <div className="absolute left-[-10%] top-[-10%] h-[500px] w-[500px] rounded-full bg-cyan-500/20 blur-[130px]" />
 
+        {/* Blue glow */}
         <div className="absolute right-[-10%] top-[20%] h-[600px] w-[600px] rounded-full bg-blue-600/20 blur-[150px]" />
 
+        {/* Purple glow */}
         <div className="absolute bottom-[-20%] left-[25%] h-[500px] w-[500px] rounded-full bg-purple-600/15 blur-[140px]" />
 
         {/* Grid */}
@@ -40,15 +67,17 @@ const Home = () => {
       </div>
 
 
-      {/* ================= NAVBAR SPACE ================= */}
+      {/* ========================================================
+          HERO
+      ======================================================== */}
 
       <section className="relative mx-auto max-w-7xl px-6 pt-20">
 
-        {/* ================= HERO ================= */}
-
         <div className="grid min-h-[85vh] items-center gap-16 lg:grid-cols-2">
 
-          {/* LEFT */}
+          {/* ====================================================
+              LEFT SIDE
+          ==================================================== */}
 
           <div className="relative z-10">
 
@@ -57,8 +86,11 @@ const Home = () => {
             <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-300 shadow-lg shadow-cyan-500/10 backdrop-blur-xl">
 
               <span className="relative flex h-2 w-2">
+
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75" />
+
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-cyan-400" />
+
               </span>
 
               AI Powered Movement Intelligence
@@ -91,13 +123,24 @@ const Home = () => {
             </p>
 
 
-            {/* Buttons */}
+            {/* ==================================================
+                BUTTONS
+            ================================================== */}
 
             <div className="mt-9 flex flex-wrap gap-4">
 
-              <button className="group flex items-center gap-3 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 px-7 py-4 font-bold text-slate-950 shadow-xl shadow-cyan-500/20 transition duration-300 hover:-translate-y-1 hover:shadow-cyan-500/40">
+              {/* START ANALYSIS */}
 
-                <Play size={19} fill="currentColor" />
+              <button
+                type="button"
+                onClick={handleStartAnalysis}
+                className="group flex items-center gap-3 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 px-7 py-4 font-bold text-slate-950 shadow-xl shadow-cyan-500/20 transition duration-300 hover:-translate-y-1 hover:shadow-cyan-500/40"
+              >
+
+                <Play
+                  size={19}
+                  fill="currentColor"
+                />
 
                 Start Analysis
 
@@ -109,7 +152,13 @@ const Home = () => {
               </button>
 
 
-              <button className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-7 py-4 font-semibold text-white backdrop-blur-xl transition hover:-translate-y-1 hover:bg-white/10">
+              {/* EXPLORE PLATFORM */}
+
+              <button
+                type="button"
+                onClick={() => navigate("/dashboard")}
+                className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-7 py-4 font-semibold text-white backdrop-blur-xl transition hover:-translate-y-1 hover:bg-white/10"
+              >
 
                 Explore Platform
 
@@ -122,14 +171,19 @@ const Home = () => {
 
             <div className="mt-9 flex items-center gap-3 text-sm text-slate-500">
 
-              <CheckCircle2 size={17} className="text-cyan-400" />
+              <CheckCircle2
+                size={17}
+                className="text-cyan-400"
+              />
 
               Real-time AI movement analysis
 
             </div>
 
 
-            {/* Stats */}
+            {/* ==================================================
+                STATS
+            ================================================== */}
 
             <div className="mt-12 grid max-w-xl grid-cols-3 gap-4">
 
@@ -153,7 +207,9 @@ const Home = () => {
           </div>
 
 
-          {/* ================= 3D VISUAL ================= */}
+          {/* ====================================================
+              RIGHT SIDE — AI VISUAL
+          ==================================================== */}
 
           <div className="relative flex min-h-[600px] items-center justify-center">
 
@@ -162,35 +218,28 @@ const Home = () => {
             <div className="absolute h-[420px] w-[420px] rounded-full bg-cyan-400/10 blur-[100px]" />
 
 
-            {/* Rotating rings */}
+            {/* Rotating Rings */}
 
             <div className="absolute h-[480px] w-[480px] animate-[spin_25s_linear_infinite] rounded-full border border-cyan-400/10 border-dashed" />
 
             <div className="absolute h-[390px] w-[390px] animate-[spin_18s_linear_infinite_reverse] rounded-full border border-blue-400/10" />
 
 
-            {/* 3D CARD */}
+            {/* ==================================================
+                MAIN AI CARD
+            ================================================== */}
 
             <div
-              className="
-              relative z-10
-              w-full max-w-[500px]
-              rounded-[35px]
-              border border-white/15
-              bg-white/[0.07]
-              p-5
-              shadow-[0_40px_100px_rgba(0,0,0,0.5)]
-              backdrop-blur-2xl
-              transition-all duration-700
-              hover:rotate-y-0 hover:rotate-x-0
-              "
+              className="relative z-10 w-full max-w-[500px] rounded-[35px] border border-white/15 bg-white/[0.07] p-5 shadow-[0_40px_100px_rgba(0,0,0,0.5)] backdrop-blur-2xl transition-all duration-700"
               style={{
                 transform:
                   "perspective(1200px) rotateY(-8deg) rotateX(5deg)",
               }}
             >
 
-              {/* Top */}
+              {/* ==================================================
+                  CARD HEADER
+              ================================================== */}
 
               <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/20 p-4">
 
@@ -215,6 +264,8 @@ const Home = () => {
                 </div>
 
 
+                {/* Active */}
+
                 <div className="flex items-center gap-2 rounded-full bg-green-400/10 px-3 py-1 text-xs text-green-400">
 
                   <span className="h-2 w-2 animate-pulse rounded-full bg-green-400" />
@@ -226,18 +277,23 @@ const Home = () => {
               </div>
 
 
-              {/* ================= HUMAN POSE ================= */}
+              {/* ==================================================
+                  HUMAN POSE
+              ================================================== */}
 
               <div className="relative mx-auto my-8 h-[320px] w-full overflow-hidden rounded-3xl border border-white/5 bg-gradient-to-b from-cyan-950/30 to-slate-950/80">
 
-                {/* scanning line */}
+                {/* Scanning line */}
 
                 <div className="absolute left-0 right-0 top-1/2 h-px animate-pulse bg-cyan-400/30 shadow-[0_0_20px_#22d3ee]" />
 
 
-                {/* circles */}
+                {/* Outer circle */}
 
                 <div className="absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-400/10" />
+
+
+                {/* Inner circle */}
 
                 <div className="absolute left-1/2 top-1/2 h-48 w-48 -translate-x-1/2 -translate-y-1/2 rounded-full border border-blue-400/10" />
 
@@ -275,23 +331,23 @@ const Home = () => {
                 {/* JOINTS */}
 
                 {[
-                  ["top-16 left-1/2"],
-                  ["top-[105px] left-[30%]"],
-                  ["top-[105px] right-[30%]"],
-                  ["top-[185px] left-1/2"],
-                  ["bottom-5 left-[42%]"],
-                  ["bottom-5 right-[42%]"],
-                ].map(([position], i) => (
+                  "top-16 left-1/2",
+                  "top-[105px] left-[30%]",
+                  "top-[105px] right-[30%]",
+                  "top-[185px] left-1/2",
+                  "bottom-5 left-[42%]",
+                  "bottom-5 right-[42%]",
+                ].map((position, index) => (
 
                   <div
-                    key={i}
+                    key={index}
                     className={`absolute ${position} h-4 w-4 rounded-full border-2 border-white bg-cyan-400 shadow-[0_0_20px_#22d3ee]`}
                   />
 
                 ))}
 
 
-                {/* AI label */}
+                {/* AI TRACKING */}
 
                 <div className="absolute left-5 top-5 rounded-xl border border-cyan-400/20 bg-black/40 px-3 py-2 text-xs text-cyan-300 backdrop-blur-xl">
 
@@ -299,6 +355,8 @@ const Home = () => {
 
                 </div>
 
+
+                {/* LANDMARKS */}
 
                 <div className="absolute bottom-5 right-5 rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-slate-400 backdrop-blur-xl">
 
@@ -309,7 +367,9 @@ const Home = () => {
               </div>
 
 
-              {/* ================= METRICS ================= */}
+              {/* ==================================================
+                  METRICS
+              ================================================== */}
 
               <div className="grid grid-cols-3 gap-3">
 
@@ -336,7 +396,9 @@ const Home = () => {
             </div>
 
 
-            {/* FLOATING CARD 1 */}
+            {/* ==================================================
+                FLOATING POSTURE CARD
+            ================================================== */}
 
             <div className="absolute -left-4 top-24 z-20 hidden animate-bounce rounded-2xl border border-white/10 bg-slate-900/80 p-4 shadow-2xl backdrop-blur-xl md:block">
 
@@ -363,7 +425,9 @@ const Home = () => {
             </div>
 
 
-            {/* FLOATING CARD 2 */}
+            {/* ==================================================
+                FLOATING CONFIDENCE CARD
+            ================================================== */}
 
             <div className="absolute -right-5 bottom-32 z-20 hidden rounded-2xl border border-white/10 bg-slate-900/80 p-4 shadow-2xl backdrop-blur-xl md:block">
 
@@ -394,7 +458,9 @@ const Home = () => {
       </section>
 
 
-      {/* ================= FEATURES ================= */}
+      {/* ========================================================
+          FEATURES
+      ======================================================== */}
 
       <section className="relative mx-auto max-w-7xl px-6 py-28">
 
@@ -408,14 +474,19 @@ const Home = () => {
 
           </div>
 
+
           <h2 className="text-4xl font-black md:text-6xl">
 
             Built Around Your
+
             <span className="block bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">
+
               Movement
+
             </span>
 
           </h2>
+
 
           <p className="mx-auto mt-5 max-w-2xl text-slate-400">
 
@@ -427,30 +498,38 @@ const Home = () => {
         </div>
 
 
+        {/* ======================================================
+            FEATURE CARDS
+        ====================================================== */}
+
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
 
           <Feature
             icon={<Camera />}
             title="Pose Detection"
             text="Real-time body landmark detection through your camera."
+            onExplore={handleStartAnalysis}
           />
 
           <Feature
             icon={<Brain />}
             title="AI Analysis"
             text="Intelligent analysis of movement patterns and posture."
+            onExplore={handleStartAnalysis}
           />
 
           <Feature
             icon={<Dumbbell />}
             title="Exercise Tracking"
             text="Automatically recognize exercises and count repetitions."
+            onExplore={handleStartAnalysis}
           />
 
           <Feature
             icon={<ShieldCheck />}
             title="Smart Monitoring"
             text="Identify incorrect movements and improve your technique."
+            onExplore={handleStartAnalysis}
           />
 
         </div>
@@ -458,13 +537,20 @@ const Home = () => {
       </section>
 
 
-      {/* ================= CTA ================= */}
+      {/* ========================================================
+          CTA
+      ======================================================== */}
 
       <section className="relative mx-6 mb-20 overflow-hidden rounded-[35px] border border-white/10 bg-gradient-to-br from-cyan-500/10 via-blue-500/10 to-purple-500/10 px-6 py-24 text-center shadow-2xl">
 
+        {/* Glow */}
+
         <div className="absolute left-1/2 top-0 h-72 w-72 -translate-x-1/2 rounded-full bg-cyan-400/10 blur-[100px]" />
 
+
         <div className="relative">
+
+          {/* Icon */}
 
           <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-400 shadow-lg shadow-cyan-500/20">
 
@@ -472,16 +558,25 @@ const Home = () => {
 
           </div>
 
+
+          {/* Heading */}
+
           <h2 className="text-4xl font-black md:text-6xl">
 
             Your Movement.
+
             <br />
 
             <span className="bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">
+
               Understood by AI.
+
             </span>
 
           </h2>
+
+
+          {/* Description */}
 
           <p className="mx-auto mt-6 max-w-xl text-slate-400">
 
@@ -489,7 +584,14 @@ const Home = () => {
 
           </p>
 
-          <button className="mt-9 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 px-9 py-4 font-bold text-slate-950 shadow-xl shadow-cyan-500/20 transition hover:-translate-y-1 hover:shadow-cyan-500/40">
+
+          {/* CTA BUTTON */}
+
+          <button
+            type="button"
+            onClick={handleStartAnalysis}
+            className="mt-9 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 px-9 py-4 font-bold text-slate-950 shadow-xl shadow-cyan-500/20 transition hover:-translate-y-1 hover:shadow-cyan-500/40"
+          >
 
             Start Analysis
 
@@ -504,12 +606,12 @@ const Home = () => {
 };
 
 
-/* ================= COMPONENTS ================= */
+/* ==============================================================
+   STAT COMPONENT
+================================================================ */
 
 const Stat = ({ value, label }) => {
-
   return (
-
     <div className="border-l border-white/10 pl-4">
 
       <p className="text-2xl font-black md:text-3xl">
@@ -521,16 +623,16 @@ const Stat = ({ value, label }) => {
       </p>
 
     </div>
-
   );
-
 };
 
 
+/* ==============================================================
+   METRIC COMPONENT
+================================================================ */
+
 const Metric = ({ icon, title, value }) => {
-
   return (
-
     <div className="rounded-2xl border border-white/5 bg-white/[0.04] p-3">
 
       <div className="flex items-center gap-2 text-slate-500">
@@ -548,30 +650,39 @@ const Metric = ({ icon, title, value }) => {
       </p>
 
     </div>
-
   );
-
 };
 
 
-const Feature = ({ icon, title, text }) => {
+/* ==============================================================
+   FEATURE COMPONENT
+================================================================ */
 
+const Feature = ({
+  icon,
+  title,
+  text,
+  onExplore,
+}) => {
   return (
-
     <div
       className="
-      group relative overflow-hidden
-      rounded-3xl
-      border border-white/10
-      bg-white/4
-      p-7
-      backdrop-blur-xl
-      transition-all duration-500
-      hover:-translate-y-3
-      hover:border-cyan-400/30
-      hover:bg-white/[0.07]
-      hover:shadow-2xl
-      hover:shadow-cyan-500/10
+        group
+        relative
+        overflow-hidden
+        rounded-3xl
+        border
+        border-white/10
+        bg-white/[0.04]
+        p-7
+        backdrop-blur-xl
+        transition-all
+        duration-500
+        hover:-translate-y-3
+        hover:border-cyan-400/30
+        hover:bg-white/[0.07]
+        hover:shadow-2xl
+        hover:shadow-cyan-500/10
       "
     >
 
@@ -582,6 +693,8 @@ const Feature = ({ icon, title, text }) => {
 
       <div className="relative">
 
+        {/* Icon */}
+
         <div className="mb-6 inline-flex rounded-2xl border border-cyan-400/10 bg-cyan-400/10 p-4 text-cyan-400 transition duration-500 group-hover:scale-110 group-hover:rotate-6">
 
           {icon}
@@ -589,17 +702,27 @@ const Feature = ({ icon, title, text }) => {
         </div>
 
 
+        {/* Title */}
+
         <h3 className="text-xl font-bold">
           {title}
         </h3>
 
+
+        {/* Description */}
 
         <p className="mt-3 text-sm leading-6 text-slate-400">
           {text}
         </p>
 
 
-        <div className="mt-6 flex items-center gap-2 text-xs font-semibold text-cyan-400">
+        {/* Explore */}
+
+        <button
+          type="button"
+          onClick={onExplore}
+          className="mt-6 flex items-center gap-2 text-xs font-semibold text-cyan-400"
+        >
 
           Explore
 
@@ -608,14 +731,12 @@ const Feature = ({ icon, title, text }) => {
             className="transition group-hover:translate-x-1"
           />
 
-        </div>
+        </button>
 
       </div>
 
     </div>
-
   );
-
 };
 
 
