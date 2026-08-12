@@ -3,6 +3,7 @@ from flask import Flask, jsonify, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from models import db, User
 from werkzeug.security import generate_password_hash
+from flask_jwt_extended import JWTManager
 # from flask_caching import Cache
 # from celery import Celery
 
@@ -13,6 +14,7 @@ from extension import cache
 
 app = Flask(__name__)
 
+jwt = JWTManager(app)
 # ============ Flask-caching setup configuration ================
 
 # app.config['CACHE_TYPE'] = 'RedisCache'
