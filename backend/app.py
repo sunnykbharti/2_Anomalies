@@ -15,6 +15,8 @@ app = Flask(__name__)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///auratrek.sqlite'
 app.config['SECRET_KEY'] = 'supersecretkey'
+app.config['JWT_SECRET_KEY'] = 'supersecretkey'
+app.config['JWT_TOKEN_LOCATION'] = ['headers', 'query_string']
 
 jwt = JWTManager(app)
 

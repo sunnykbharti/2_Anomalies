@@ -1849,14 +1849,12 @@ const PoseAnalysis = () => {
 
       setAnalysisRunning(true);
       setBodyStatus("Detecting");
-
-      setFeedback(
-        "Analysis UI started. Backend connection can be added."
+      setFeedback("AI Pose Analysis active.");
+      setFeedbackType("success");
+      captureIntervalRef.current = setInterval(
+        captureAndAnalyzeFrame,
+        ANALYSIS_INTERVAL_MS
       );
-
-      setFeedbackType("info");
-      // Not starting the capture loop here since there's no backend to send to.
-
     } finally {
       setLoading(false);
     }
