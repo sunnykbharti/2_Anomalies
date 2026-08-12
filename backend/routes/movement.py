@@ -114,14 +114,27 @@ def analyze_frame():
 
     annotated_b64 = "data:image/jpeg;base64," + base64.b64encode(buffer).decode("utf-8")
 
-    # Generate or update Live AI Feed Insight
+    # Generate or update Live AI Feed Insight (throttled every 15 frames or issue change)
     rep_log = getattr(_active["analyzer"], "rep_log", [])
-    ai_insight = ai_summarizer.generate_live_feed_insight(
-        _active["exercise"],
-        metrics,
-        rep_log
+    has_issues = bool(metrics.get("issues"))
+    last_had_issues = _active.get("last_had_issues", False)
+    _active["last_had_issues"] = has_issues
+
+    should_call_ai = (
+        _active["last_ai_insight"] is None or
+        _active["frame_count"] % 15 == 1 or
+        has_issues != last_had_issues
     )
-    _active["last_ai_insight"] = ai_insight
+
+    if should_call_ai:
+        ai_insight = ai_summarizer.generate_live_feed_insight(
+            _active["exercise"],
+            metrics,
+            rep_log
+        )
+        _active["last_ai_insight"] = ai_insight
+    else:
+        ai_insight = _active["last_ai_insight"]
 
     # Ensure feedback field is AI-generated
     ai_feedback_text = ai_insight.get("live_speech") or ai_insight.get("coaching_tip") or metrics.get("feedback", "")

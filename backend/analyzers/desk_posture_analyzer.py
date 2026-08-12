@@ -99,18 +99,30 @@ class DeskPostureAnalyzer:
                 if not issues:
                     self.good_frames += 1
                     self.consecutive_bad_frames = 0
-                    feedback = f"उत्कृष्ट स्टडी पोज़ (Excellent Desk Posture - Score: {score}/100)"
+                    feedback = "उत्कृष्ट स्टडी पोज़! पीठ और गर्दन का संतुलन बहुत अच्छा है।"
                 else:
                     self.bad_frames += 1
                     self.consecutive_bad_frames += 1
-                    feedback = "मुद्रा में सुधार करें: " + ", ".join(issues)
+                    
+                    # Construct clear human-friendly feedback phrase
+                    clean_issues = []
+                    if "झुककर बैठना (Slouching)" in issues:
+                        clean_issues.append("पीठ सीधी रखें")
+                    if "गर्दन आगे की ओर झुकी (Forward Neck / Text Neck)" in issues:
+                        clean_issues.append("गर्दन पीछे लाएं")
+                    if "कंधे असमान हैं (Shoulder Tilt)" in issues:
+                        clean_issues.append("कंधे सीधे रखें")
+                    if "स्क्रीन के बहुत पास (Too Close to Screen)" in issues:
+                        clean_issues.append("स्क्रीन से दूरी बनाएं")
+                        
+                    feedback = "कृपया ध्यान दें: " + ", ".join(clean_issues if clean_issues else issues)
 
                     # Trigger alert if poor posture persists for > 15 consecutive frames
                     if self.consecutive_bad_frames > 15:
                         alert_triggered = True
 
             else:
-                feedback = "कृपया स्टडी / इंटरव्यू पोज़िशन में सीधे बैठें"
+                feedback = "कृपया कैमरे के सामने सीधे स्टडी पोज़िशन में बैठें।"
 
         total_tracked = self.good_frames + self.bad_frames
         accuracy = round(100 * self.good_frames / total_tracked, 1) if total_tracked > 0 else 0.0

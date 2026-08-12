@@ -1613,30 +1613,57 @@ const PoseAnalysis = () => {
   // Audio voice feedback state
   const [speechEnabled, setSpeechEnabled] = useState(true);
   const lastSpokenRef = useRef({ text: "", time: 0 });
+  const globalSpeechCooldownRef = useRef(0);
 
   const speakFeedback = (text) => {
     if (!speechEnabled || !("speechSynthesis" in window) || !text) return;
 
-    const cleanText = text.split("|")[0].replace(/^GOOD:\s*/i, "").trim();
-    if (!cleanText || cleanText === "कोई व्यक्ति नहीं दिखा" || cleanText === "No person detected") return;
+    // Clean text: strip out raw system tags, scores, and parentheticals
+    let cleanText = text
+      .replace(/^GOOD:\s*/i, "")
+      .replace(/\(Score:.*?\)/gi, "")
+      .replace(/Score:\s*\d+\/\d+/gi, "")
+      .replace(/Excellent Desk Posture/gi, "")
+      .split("|")[0]
+      .trim();
+
+    if (
+      !cleanText ||
+      cleanText.includes("कोई व्यक्ति नहीं दिखा") ||
+      cleanText.includes("No person detected") ||
+      cleanText.includes("Waiting")
+    ) {
+      return;
+    }
 
     const now = Date.now();
+
+    // 1. DO NOT interrupt active speech mid-sentence!
+    if (window.speechSynthesis.speaking) {
+      return;
+    }
+
+    // 2. Global cooldown between ANY speech utterances (min 4 seconds after previous speech)
+    if (now - globalSpeechCooldownRef.current < 4000) {
+      return;
+    }
+
+    // 3. Throttle identical repeated feedback (min 10 seconds before speaking the exact same phrase)
     if (
       cleanText === lastSpokenRef.current.text &&
-      now - lastSpokenRef.current.time < 3000
+      now - lastSpokenRef.current.time < 10000
     ) {
       return;
     }
 
     try {
-      window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(cleanText);
 
       // Auto-detect Devanagari / Hindi script vs English
       const hasDevanagari = /[\u0900-\u097F]/.test(cleanText);
       utterance.lang = hasDevanagari ? "hi-IN" : "en-US";
-      utterance.rate = hasDevanagari ? 0.88 : 0.95;
-      utterance.pitch = hasDevanagari ? 1.02 : 1.0;
+      utterance.rate = hasDevanagari ? 0.90 : 0.95;
+      utterance.pitch = 1.0;
       utterance.volume = 1.0;
 
       const voices = window.speechSynthesis.getVoices();
@@ -1652,7 +1679,12 @@ const PoseAnalysis = () => {
         if (englishVoice) utterance.voice = englishVoice;
       }
 
+      utterance.onend = () => {
+        globalSpeechCooldownRef.current = Date.now();
+      };
+
       lastSpokenRef.current = { text: cleanText, time: now };
+      globalSpeechCooldownRef.current = now;
       window.speechSynthesis.speak(utterance);
     } catch (err) {
       console.warn("TTS error:", err);
@@ -1846,7 +1878,8 @@ const PoseAnalysis = () => {
 
       if (metrics.feedback) {
         setFeedback(metrics.feedback);
-        speakFeedback(metrics.feedback);
+        const spokenPhrase = ai_live_summary?.live_speech || metrics.feedback;
+        speakFeedback(spokenPhrase);
 
         const lower = metrics.feedback.toLowerCase();
         if (lower.includes("good") || lower.includes("correct")) {
