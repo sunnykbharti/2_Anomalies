@@ -1,7 +1,7 @@
 import os
 from flask import Flask, jsonify, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
-from models import db, Users, Staff, Trekker, Treks
+from models import db, User
 from werkzeug.security import generate_password_hash
 from flask_caching import Cache
 from celery import Celery
