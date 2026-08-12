@@ -29,6 +29,9 @@ app.config['SECRET_KEY'] = 'supersecretkey'
 
 db.init_app(app)
 
+from routes.auth import auth_bp
+app.register_blueprint(auth_bp)
+
 # ============ CORS configuration =====================
 
 from flask_cors import CORS
