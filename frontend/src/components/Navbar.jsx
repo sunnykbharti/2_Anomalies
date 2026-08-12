@@ -9,6 +9,7 @@ import {
   User,
   LogOut,
   Sparkles,
+  Trophy,
 } from "lucide-react";
 
 const Navbar = () => {
@@ -94,6 +95,13 @@ const Navbar = () => {
                 to="/progress"
                 icon={<TrendingUp size={17} />}
                 text="Progress"
+              />
+
+              {/* Leaderboard */}
+              <NavItem
+                to="/leaderboard"
+                icon={<Trophy size={17} />}
+                text="Leaderboard"
               />
 
               {/* Exercises */}

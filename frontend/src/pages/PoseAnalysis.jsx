@@ -1529,6 +1529,10 @@ import { useNavigate } from "react-router-dom";
 import {
   Activity,
   ArrowLeft,
+  Award,
+  BookOpen,
+  Bot,
+  Brain,
   Camera,
   CheckCircle2,
   CircleStop,
@@ -1537,11 +1541,13 @@ import {
   Eye,
   Gauge,
   Info,
+  Lightbulb,
   Play,
   RotateCcw,
   ShieldCheck,
   Sparkles,
   Target,
+  TrendingUp,
   Video,
   Volume2,
   VolumeX,
@@ -1597,6 +1603,9 @@ const PoseAnalysis = () => {
   const [sessionResult, setSessionResult] =
     useState(null);
 
+  // Real-time AI Feed Summary & Telemetry Insight state
+  const [liveAiSummary, setLiveAiSummary] = useState(null);
+
   // The skeleton-annotated JPEG returned by the backend each frame.
   const [annotatedFrame, setAnnotatedFrame] =
     useState(null);
@@ -1609,14 +1618,12 @@ const PoseAnalysis = () => {
     if (!speechEnabled || !("speechSynthesis" in window) || !text) return;
 
     const cleanText = text.split("|")[0].replace(/^GOOD:\s*/i, "").trim();
-    if (!cleanText || cleanText === "कोई व्यक्ति नहीं दिखा") return;
+    if (!cleanText || cleanText === "कोई व्यक्ति नहीं दिखा" || cleanText === "No person detected") return;
 
     const now = Date.now();
-    const isRepAnnouncement = cleanText.includes("पिछला रेप");
     if (
-      !isRepAnnouncement &&
       cleanText === lastSpokenRef.current.text &&
-      now - lastSpokenRef.current.time < 4000
+      now - lastSpokenRef.current.time < 3000
     ) {
       return;
     }
@@ -1624,18 +1631,25 @@ const PoseAnalysis = () => {
     try {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(cleanText);
-      utterance.lang = "hi-IN";
-      utterance.rate = 0.85;
-      utterance.pitch = 1.0;
+
+      // Auto-detect Devanagari / Hindi script vs English
+      const hasDevanagari = /[\u0900-\u097F]/.test(cleanText);
+      utterance.lang = hasDevanagari ? "hi-IN" : "en-US";
+      utterance.rate = hasDevanagari ? 0.88 : 0.95;
+      utterance.pitch = hasDevanagari ? 1.02 : 1.0;
       utterance.volume = 1.0;
 
-      // Try to find a Hindi voice
       const voices = window.speechSynthesis.getVoices();
-      const hindiVoice = voices.find(
-        (v) => v.lang === "hi-IN" || v.lang.startsWith("hi")
-      );
-      if (hindiVoice) {
-        utterance.voice = hindiVoice;
+      if (hasDevanagari) {
+        const hindiVoice = voices.find(
+          (v) => v.lang === "hi-IN" || v.lang.startsWith("hi")
+        );
+        if (hindiVoice) utterance.voice = hindiVoice;
+      } else {
+        const englishVoice = voices.find(
+          (v) => v.lang === "en-US" || v.lang.startsWith("en")
+        );
+        if (englishVoice) utterance.voice = englishVoice;
       }
 
       lastSpokenRef.current = { text: cleanText, time: now };
@@ -1650,6 +1664,15 @@ const PoseAnalysis = () => {
   // ============================================================
 
   const exercises = [
+    {
+      id: "desk_posture",
+      name: "Study & Interview Guard",
+      category: "Desk Ergonomics",
+      icon: <BookOpen size={20} />,
+      description:
+        "Real-time neck tilt, slouching, and distance alerts for long study & test sessions.",
+    },
+
     {
       id: "squat",
       name: "Squat",
@@ -1702,6 +1725,15 @@ const PoseAnalysis = () => {
       icon: <Gauge size={20} />,
       description:
         "Analyze shoulder, hip and spine alignment.",
+    },
+
+    {
+      id: "posture",
+      name: "General Posture",
+      category: "Ergonomics",
+      icon: <Eye size={20} />,
+      description:
+        "Analyze overall posture balance and shoulder level.",
     },
   ];
 
@@ -1795,9 +1827,12 @@ const PoseAnalysis = () => {
         exercise: selectedExercise,
       });
 
-      const { annotated_image, metrics } = response.data;
+      const { annotated_image, metrics, ai_live_summary } = response.data;
 
       setAnnotatedFrame(annotated_image);
+      if (ai_live_summary) {
+        setLiveAiSummary(ai_live_summary);
+      }
 
       const totalReps = metrics.total_reps ?? 0;
       const correctReps = metrics.correct_reps ?? 0;
@@ -2039,6 +2074,7 @@ const PoseAnalysis = () => {
     setAccuracy(0);
     setBodyStatus("Waiting");
     setAnnotatedFrame(null);
+    setLiveAiSummary(null);
 
     setFeedback(
       "कैमरे के सामने खड़े हों।"
@@ -2645,6 +2681,76 @@ const PoseAnalysis = () => {
 
           <aside className="space-y-5">
 
+            {/* =================================================
+                AI LIVE SUMMARY CO-PILOT CARD
+            ================================================= */}
+            <div className="overflow-hidden rounded-[26px] border border-cyan-500/30 bg-gradient-to-b from-cyan-950/40 via-slate-900/60 to-slate-950/80 p-5 shadow-xl backdrop-blur-xl">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400/20 text-cyan-300 ring-1 ring-cyan-400/30">
+                    <Bot size={20} className={analysisRunning ? "animate-bounce" : ""} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-100 flex items-center gap-2 text-sm">
+                      AI Live Feed Summary
+                      <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-semibold text-cyan-300 ring-1 ring-cyan-400/30">
+                        Live Data
+                      </span>
+                    </h3>
+                    <p className="text-[10px] uppercase tracking-wider text-slate-500">
+                      Telemetry AI Parser
+                    </p>
+                  </div>
+                </div>
+                <Brain size={18} className="text-cyan-400" />
+              </div>
+
+              {liveAiSummary ? (
+                <div className="space-y-3">
+                  {/* Form Quality Badge */}
+                  <div className="flex items-center justify-between rounded-xl bg-white/[0.04] p-3 border border-white/5">
+                    <span className="text-xs text-slate-400 font-medium">Form Evaluation</span>
+                    <span className={`rounded-lg px-2.5 py-1 text-xs font-bold ${
+                      liveAiSummary.form_quality === "Optimal"
+                        ? "bg-emerald-400/15 text-emerald-300 border border-emerald-400/30"
+                        : liveAiSummary.form_quality === "Needs Attention"
+                        ? "bg-amber-400/15 text-amber-300 border border-amber-400/30"
+                        : "bg-red-400/15 text-red-300 border border-red-400/30"
+                    }`}>
+                      {liveAiSummary.form_quality || "Optimal"}
+                    </span>
+                  </div>
+
+                  {/* Summary Text */}
+                  <div className="rounded-xl border border-white/5 bg-black/40 p-3">
+                    <p className="text-xs leading-5 text-slate-200 font-normal">
+                      {liveAiSummary.summary}
+                    </p>
+                  </div>
+
+                  {/* Coaching Tip */}
+                  {liveAiSummary.coaching_tip && (
+                    <div className="flex items-start gap-2.5 rounded-xl border border-cyan-500/20 bg-cyan-500/10 p-3">
+                      <Lightbulb size={16} className="mt-0.5 shrink-0 text-cyan-300 animate-pulse" />
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-cyan-300">
+                          AI Coaching Tip
+                        </p>
+                        <p className="mt-0.5 text-xs text-slate-200 leading-snug">
+                          {liveAiSummary.coaching_tip}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-white/5 bg-black/20 p-4 text-center">
+                  <p className="text-xs text-slate-500">
+                    Start camera & AI analysis to parse live feed data into real-time AI summaries.
+                  </p>
+                </div>
+              )}
+            </div>
 
             {/* =================================================
                 LIVE FEEDBACK
@@ -2959,25 +3065,77 @@ const PoseAnalysis = () => {
             </div>
 
 
-            {sessionResult.feedback && (
+            {sessionResult.ai_report ? (
+              <div className="mt-6 space-y-4 rounded-2xl border border-cyan-400/20 bg-black/30 p-5">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div>
+                    <h3 className="text-lg font-bold text-cyan-300">
+                      {sessionResult.ai_report.headline || "AI Posture Report"}
+                    </h3>
+                    <p className="text-xs text-slate-400 font-medium">
+                      {sessionResult.ai_report.score_text || "Performance Grade"}
+                    </p>
+                  </div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400/10 text-cyan-400">
+                    <Award size={22} />
+                  </div>
+                </div>
 
-              <div className="mt-6 rounded-2xl border border-white/5 bg-black/10 p-4">
-
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-600">
-
-                  AI Feedback
-
+                <p className="text-sm leading-relaxed text-slate-200">
+                  {sessionResult.ai_report.overview}
                 </p>
 
-                <p className="mt-2 text-sm text-slate-300">
+                <div className="grid gap-4 md:grid-cols-2">
+                  {sessionResult.ai_report.key_strengths && (
+                    <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-3.5">
+                      <p className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5 mb-2">
+                        <CheckCircle2 size={15} /> Key Strengths
+                      </p>
+                      <ul className="space-y-1.5 text-xs text-slate-300">
+                        {sessionResult.ai_report.key_strengths.map((str, idx) => (
+                          <li key={idx} className="flex items-start gap-1.5">
+                            <span className="text-emerald-400">•</span>
+                            <span>{str}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
-                  {sessionResult.feedback}
+                  {sessionResult.ai_report.areas_for_improvement && (
+                    <div className="rounded-xl border border-amber-400/20 bg-amber-400/5 p-3.5">
+                      <p className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5 mb-2">
+                        <Target size={15} /> Areas for Improvement
+                      </p>
+                      <ul className="space-y-1.5 text-xs text-slate-300">
+                        {sessionResult.ai_report.areas_for_improvement.map((imp, idx) => (
+                          <li key={idx} className="flex items-start gap-1.5">
+                            <span className="text-amber-400">•</span>
+                            <span>{imp}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
 
-                </p>
-
+                {sessionResult.ai_report.safety_note && (
+                  <div className="flex items-start gap-2.5 rounded-xl border border-blue-400/20 bg-blue-400/5 p-3 text-xs text-slate-300">
+                    <ShieldCheck size={16} className="mt-0.5 shrink-0 text-blue-400" />
+                    <span><strong>Safety Note:</strong> {sessionResult.ai_report.safety_note}</span>
+                  </div>
+                )}
               </div>
-
-            )}
+            ) : sessionResult.feedback ? (
+              <div className="mt-6 rounded-2xl border border-white/5 bg-black/10 p-4">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                  AI Feedback Summary
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-slate-300 whitespace-pre-line">
+                  {sessionResult.feedback}
+                </p>
+              </div>
+            ) : null}
 
           </section>
 

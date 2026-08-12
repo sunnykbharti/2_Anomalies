@@ -12,6 +12,7 @@ import Sessions from "./pages/Sessions";
 import Progress from "./pages/Progress";
 import Profile from "./pages/Profile";
 import Exercise from "./pages/Exercises";
+import Leaderboard from "./pages/Leaderboard";
 
 const Router = () => {
   const routes = createBrowserRouter([
@@ -54,6 +55,11 @@ const Router = () => {
     {
       path: "/exercises",
       element: <Exercise />,
+    },
+
+    {
+      path: "/leaderboard",
+      element: <Leaderboard />,
     },
 
     {

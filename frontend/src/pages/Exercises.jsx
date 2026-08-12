@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import {
   Activity,
   ArrowRight,
+  BookOpen,
   CheckCircle2,
   Clock3,
   Dumbbell,
@@ -16,6 +17,21 @@ import {
 } from "lucide-react";
 
 const exercises = [
+  {
+    id: 0,
+    name: "Study & Interview Posture Guard",
+    category: "Ergonomics",
+    difficulty: "All Levels",
+    duration: "Continuous",
+    calories: "Focus Mode",
+    description:
+      "Monitors text neck, slouching, shoulder tilt, and proximity during study sessions and remote interviews.",
+    image:
+      "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=900&q=80",
+    video:
+      "https://www.youtube.com/watch?v=RqcOCb4IAL8",
+    tags: ["Ergonomics", "Study", "Interview", "Text Neck"],
+  },
   {
     id: 1,
     name: "Squats",
