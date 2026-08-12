@@ -1,3 +1,4 @@
+import cv2
 import time
 import numpy as np
 from collections import deque
@@ -10,7 +11,7 @@ LEFT_HIP, RIGHT_HIP = 11, 12
 LEFT_KNEE, RIGHT_KNEE = 13, 14
 LEFT_ANKLE, RIGHT_ANKLE = 15, 16
 
-KEYPOINT_CONFIDENCE_THRESHOLD = 0.50
+KEYPOINT_CONFIDENCE_THRESHOLD = 0.25
 SMOOTHING_WINDOW = 5
 
 POSES = {
@@ -60,8 +61,10 @@ class YogaAnalyzer:
         self.rep_log = []
 
     def process_frame(self, frame):
-        results = self.model(frame, verbose=False)
-        output = results[0].plot()
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        results = self.model(frame_rgb, verbose=False)
+        output_rgb = results[0].plot()
+        output_bgr = cv2.cvtColor(output_rgb, cv2.COLOR_RGB2BGR)
 
         feedback = "No person detected"
         is_good = False
@@ -105,7 +108,7 @@ class YogaAnalyzer:
                     self.pose_hold_start = None
                     self.current_hold_duration = 0.0
 
-        return output, {
+        return output_bgr, {
             "stage": POSES.get(self.target_pose, "Yoga Pose"),
             "total_reps": self.completed_holds,
             "correct_reps": self.completed_holds,
@@ -114,17 +117,21 @@ class YogaAnalyzer:
             "feedback": feedback,
         }
 
-    def _reliable(self, person, indexes):
-        return all(person[idx][2] > KEYPOINT_CONFIDENCE_THRESHOLD for idx in indexes)
+    def _reliable(self, person, indexes, min_count=None):
+        confs = [person[idx][2] for idx in indexes]
+        valid = [c > KEYPOINT_CONFIDENCE_THRESHOLD for c in confs]
+        if min_count is None:
+            return all(valid)
+        return sum(valid) >= min_count
 
     def _check_tree(self, person):
         idx = [LEFT_HIP, RIGHT_HIP, LEFT_KNEE, RIGHT_KNEE, LEFT_ANKLE, RIGHT_ANKLE]
-        if not self._reliable(person, idx):
+        if not self._reliable(person, idx, min_count=4):
             return "Show lower body clearly"
 
         l_ank_y, r_ank_y = person[LEFT_ANKLE][1], person[RIGHT_ANKLE][1]
-        lifted_left = l_ank_y < r_ank_y - 25
-        lifted_right = r_ank_y < l_ank_y - 25
+        lifted_left = l_ank_y < r_ank_y - 20
+        lifted_right = r_ank_y < l_ank_y - 20
 
         if not lifted_left and not lifted_right:
             return "Lift one foot and place on ankle/calf"
@@ -133,20 +140,20 @@ class YogaAnalyzer:
 
     def _check_tadasana(self, person):
         idx = [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_HIP, RIGHT_HIP, LEFT_ANKLE, RIGHT_ANKLE]
-        if not self._reliable(person, idx):
+        if not self._reliable(person, idx, min_count=4):
             return "Show full body standing straight"
 
         sh_width = distance(person[LEFT_SHOULDER], person[RIGHT_SHOULDER])
         ank_width = distance(person[LEFT_ANKLE], person[RIGHT_ANKLE])
 
-        if ank_width > sh_width * 1.6:
+        if ank_width > sh_width * 1.8:
             return "Bring feet closer together"
 
         return "GOOD: Tadasana alignment"
 
     def _check_warrior_two(self, person):
         idx = [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_WRIST, RIGHT_WRIST, LEFT_HIP, RIGHT_HIP, LEFT_KNEE, RIGHT_KNEE, LEFT_ANKLE, RIGHT_ANKLE]
-        if not self._reliable(person, idx):
+        if not self._reliable(person, idx, min_count=6):
             return "Extend arms and widen stance"
 
         l_knee_angle = calculate_angle(person[LEFT_HIP][:2], person[LEFT_KNEE][:2], person[LEFT_ANKLE][:2])
@@ -155,29 +162,29 @@ class YogaAnalyzer:
         hands_w = distance(person[LEFT_WRIST], person[RIGHT_WRIST])
         sh_w = distance(person[LEFT_SHOULDER], person[RIGHT_SHOULDER])
 
-        if hands_w < sh_w * 2.0:
+        if hands_w < sh_w * 1.6:
             return "Extend both arms parallel to floor"
-        if min(l_knee_angle, r_knee_angle) > 135:
-            return "Bend your front knee to 90 degrees"
+        if min(l_knee_angle, r_knee_angle) > 140:
+            return "Bend your front knee"
 
         return "GOOD: Warrior II alignment"
 
     def _check_triangle(self, person):
         idx = [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_HIP, RIGHT_HIP, LEFT_KNEE, RIGHT_KNEE, LEFT_ANKLE, RIGHT_ANKLE]
-        if not self._reliable(person, idx):
+        if not self._reliable(person, idx, min_count=5):
             return "Show full body in wide triangle stance"
 
         l_leg = calculate_angle(person[LEFT_HIP][:2], person[LEFT_KNEE][:2], person[LEFT_ANKLE][:2])
         r_leg = calculate_angle(person[RIGHT_HIP][:2], person[RIGHT_KNEE][:2], person[RIGHT_ANKLE][:2])
 
-        if min(l_leg, r_leg) < 145:
+        if min(l_leg, r_leg) < 140:
             return "Keep both legs straight and extended"
 
         return "GOOD: Triangle Pose alignment"
 
     def _check_downward_dog(self, person):
         idx = [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_HIP, RIGHT_HIP, LEFT_ANKLE, RIGHT_ANKLE]
-        if not self._reliable(person, idx):
+        if not self._reliable(person, idx, min_count=4):
             return "Show shoulders, hips, and ankles"
 
         sh_c = midpoint(person[LEFT_SHOULDER], person[RIGHT_SHOULDER])
@@ -190,13 +197,13 @@ class YogaAnalyzer:
 
     def _check_cobra(self, person):
         idx = [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_HIP, RIGHT_HIP, LEFT_ELBOW, RIGHT_ELBOW]
-        if not self._reliable(person, idx):
+        if not self._reliable(person, idx, min_count=4):
             return "Show upper body on mat"
 
         sh_c = midpoint(person[LEFT_SHOULDER], person[RIGHT_SHOULDER])
         hip_c = midpoint(person[LEFT_HIP], person[RIGHT_HIP])
 
-        if abs(hip_c[1] - sh_c[1]) < 35:
+        if abs(hip_c[1] - sh_c[1]) < 25:
             return "Lift chest gently upward"
 
         return "GOOD: Cobra Pose alignment"

@@ -1746,6 +1746,7 @@ const PoseAnalysis = () => {
     try {
       const response = await api.post("/pose/analyze_frame", {
         image: imageData,
+        exercise: selectedExercise,
       });
 
       const { annotated_image, metrics } = response.data;

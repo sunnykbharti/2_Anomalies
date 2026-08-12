@@ -1,3 +1,4 @@
+import cv2
 import numpy as np
 from collections import deque
 from ultralytics import YOLO
@@ -9,9 +10,9 @@ LEFT_WRIST, RIGHT_WRIST = 9, 10
 LEFT_HIP, RIGHT_HIP = 11, 12
 LEFT_ANKLE, RIGHT_ANKLE = 15, 16
 
-KEYPOINT_CONFIDENCE_THRESHOLD = 0.50
+KEYPOINT_CONFIDENCE_THRESHOLD = 0.25
 UP_ANGLE_THRESHOLD = 155.0
-DOWN_ANGLE_THRESHOLD = 105.0
+DOWN_ANGLE_THRESHOLD = 110.0
 GOOD_DEPTH_ELBOW_ANGLE = 95.0
 BODY_STRAIGHT_THRESHOLD = 160.0
 SMOOTHING_WINDOW = 5
@@ -25,15 +26,11 @@ def calculate_angle(a, b, c):
     return float(np.degrees(np.arccos(cos)))
 
 
-def midpoint(a, b):
-    return (np.array(a[:2]) + np.array(b[:2])) / 2.0
-
-
 class PushupAnalyzer:
     """
     Push-up Analyzer class.
     Processes frames in real time and detects posture issues (hip sagging/hiking, shallow depth)
-    and tracks repetition counts.
+    and tracks repetition counts. Supports side-view analysis.
     """
 
     def __init__(self, model_path="yolo11n-pose.pt"):
@@ -55,8 +52,10 @@ class PushupAnalyzer:
         self.rep_log = []
 
     def process_frame(self, frame):
-        results = self.model(frame, verbose=False)
-        output = results[0].plot()
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        results = self.model(frame_rgb, verbose=False)
+        output_rgb = results[0].plot()
+        output_bgr = cv2.cvtColor(output_rgb, cv2.COLOR_RGB2BGR)
 
         feedback = "No person detected"
         avg_elbow = None
@@ -72,36 +71,49 @@ class PushupAnalyzer:
             l_hip, r_hip = person[LEFT_HIP], person[RIGHT_HIP]
             l_ank, r_ank = person[LEFT_ANKLE], person[RIGHT_ANKLE]
 
-            important = [l_sh, r_sh, l_el, r_el, l_wr, r_wr, l_hip, r_hip, l_ank, r_ank]
-            reliable = all(p[2] > KEYPOINT_CONFIDENCE_THRESHOLD for p in important)
+            left_side_conf = min(l_sh[2], l_el[2], l_wr[2], l_hip[2], l_ank[2])
+            right_side_conf = min(r_sh[2], r_el[2], r_wr[2], r_hip[2], r_ank[2])
 
-            if reliable:
-                left_elbow_deg = calculate_angle(l_sh[:2], l_el[:2], l_wr[:2])
-                right_elbow_deg = calculate_angle(r_sh[:2], r_el[:2], r_wr[:2])
-                self.elbow_angle_history.append((left_elbow_deg + right_elbow_deg) / 2.0)
-                avg_elbow = np.mean(self.elbow_angle_history)
+            reliable_left = left_side_conf > KEYPOINT_CONFIDENCE_THRESHOLD
+            reliable_right = right_side_conf > KEYPOINT_CONFIDENCE_THRESHOLD
 
-                sh_center = midpoint(l_sh, r_sh)
-                hip_center = midpoint(l_hip, r_hip)
-                ank_center = midpoint(l_ank, r_ank)
-
-                body_deg = calculate_angle(sh_center, hip_center, ank_center)
-                self.body_angle_history.append(body_deg)
-                avg_body = np.mean(self.body_angle_history)
-
+            if reliable_left or reliable_right:
+                elbow_angles = []
+                body_angles = []
                 frame_errors = set()
+
+                if reliable_left:
+                    el_ang = calculate_angle(l_sh[:2], l_el[:2], l_wr[:2])
+                    bd_ang = calculate_angle(l_sh[:2], l_hip[:2], l_ank[:2])
+                    elbow_angles.append(el_ang)
+                    body_angles.append(bd_ang)
+
+                if reliable_right:
+                    el_ang = calculate_angle(r_sh[:2], r_el[:2], r_wr[:2])
+                    bd_ang = calculate_angle(r_sh[:2], r_hip[:2], r_ank[:2])
+                    elbow_angles.append(el_ang)
+                    body_angles.append(bd_ang)
+
+                self.elbow_angle_history.append(np.mean(elbow_angles))
+                self.body_angle_history.append(np.mean(body_angles))
+
+                avg_elbow = float(np.mean(self.elbow_angle_history))
+                avg_body = float(np.mean(self.body_angle_history))
+
                 if avg_body < BODY_STRAIGHT_THRESHOLD:
-                    expected_hip_y = (sh_center[1] + ank_center[1]) / 2.0
-                    if hip_center[1] > expected_hip_y:
+                    # Select active side keypoints
+                    sh, hip, ank = (l_sh, l_hip, l_ank) if left_side_conf >= right_side_conf else (r_sh, r_hip, r_ank)
+                    expected_hip_y = (sh[1] + ank[1]) / 2.0
+                    if hip[1] > expected_hip_y:
                         frame_errors.add("hips_sagging")
                     else:
                         frame_errors.add("hips_piked")
 
                 feedback = self._run_state_machine(avg_elbow, avg_body, frame_errors)
             else:
-                feedback = "Show full body in side/plank view"
+                feedback = "Show full body in side view"
 
-        return output, {
+        return output_bgr, {
             "stage": self.pushup_stage,
             "total_reps": self.total_repetitions,
             "correct_reps": self.correct_repetitions,

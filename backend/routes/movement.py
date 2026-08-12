@@ -71,10 +71,15 @@ def analyze_frame():
     except Exception:
         pass
 
-    if not _active["running"] or _active["analyzer"] is None:
-        return jsonify({"error": "no active session — call /pose/start first"}), 400
-
     data = request.get_json(silent=True) or {}
+
+    if not _active["running"] or _active["analyzer"] is None:
+        exercise_type = data.get("exercise", "squat")
+        if exercise_type not in ANALYZERS:
+            exercise_type = "squat"
+        _active["exercise"] = exercise_type
+        _active["analyzer"] = ANALYZERS[exercise_type]()
+        _active["running"] = True
     image_data_url = data.get("image")
     if not image_data_url:
         return jsonify({"error": "missing 'image' field"}), 400

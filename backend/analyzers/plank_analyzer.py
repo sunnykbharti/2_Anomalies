@@ -1,3 +1,4 @@
+import cv2
 import time
 import numpy as np
 from collections import deque
@@ -7,8 +8,8 @@ LEFT_SHOULDER, RIGHT_SHOULDER = 5, 6
 LEFT_HIP, RIGHT_HIP = 11, 12
 LEFT_ANKLE, RIGHT_ANKLE = 15, 16
 
-KEYPOINT_CONFIDENCE_THRESHOLD = 0.50
-BODY_STRAIGHT_THRESHOLD = 162.0
+KEYPOINT_CONFIDENCE_THRESHOLD = 0.25
+BODY_STRAIGHT_THRESHOLD = 158.0
 
 
 def calculate_angle(a, b, c):
@@ -17,10 +18,6 @@ def calculate_angle(a, b, c):
     denom = np.linalg.norm(ba) * np.linalg.norm(bc) + 1e-8
     cos = np.clip(np.dot(ba, bc) / denom, -1.0, 1.0)
     return float(np.degrees(np.arccos(cos)))
-
-
-def midpoint(a, b):
-    return (np.array(a[:2]) + np.array(b[:2])) / 2.0
 
 
 class PlankAnalyzer:
@@ -42,8 +39,10 @@ class PlankAnalyzer:
         self.rep_log = []
 
     def process_frame(self, frame):
-        results = self.model(frame, verbose=False)
-        output = results[0].plot()
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        results = self.model(frame_rgb, verbose=False)
+        output_rgb = results[0].plot()
+        output_bgr = cv2.cvtColor(output_rgb, cv2.COLOR_RGB2BGR)
 
         feedback = "No person detected"
         body_angle = None
@@ -57,22 +56,22 @@ class PlankAnalyzer:
             l_hip, r_hip = person[LEFT_HIP], person[RIGHT_HIP]
             l_ank, r_ank = person[LEFT_ANKLE], person[RIGHT_ANKLE]
 
-            important = [l_sh, r_sh, l_hip, r_hip, l_ank, r_ank]
-            reliable = all(p[2] > KEYPOINT_CONFIDENCE_THRESHOLD for p in important)
+            left_conf = min(l_sh[2], l_hip[2], l_ank[2])
+            right_conf = min(r_sh[2], r_hip[2], r_ank[2])
 
-            if reliable:
-                sh_c = midpoint(l_sh, r_sh)
-                hip_c = midpoint(l_hip, r_hip)
-                ank_c = midpoint(l_ank, r_ank)
+            reliable_left = left_conf > KEYPOINT_CONFIDENCE_THRESHOLD
+            reliable_right = right_conf > KEYPOINT_CONFIDENCE_THRESHOLD
 
-                body_angle = calculate_angle(sh_c, hip_c, ank_c)
+            if reliable_left or reliable_right:
+                sh, hip, ank = (l_sh, l_hip, l_ank) if left_conf >= right_conf else (r_sh, r_hip, r_ank)
+                body_angle = calculate_angle(sh[:2], hip[:2], ank[:2])
 
                 if body_angle >= BODY_STRAIGHT_THRESHOLD:
                     is_good = True
                     feedback = f"GOOD: Perfect Plank Posture ({body_angle:.0f}°)"
                 else:
-                    expected_hip_y = (sh_c[1] + ank_c[1]) / 2.0
-                    if hip_c[1] > expected_hip_y:
+                    expected_hip_y = (sh[1] + ank[1]) / 2.0
+                    if hip[1] > expected_hip_y:
                         feedback = "Engage core - hips are sagging"
                     else:
                         feedback = "Lower your hips - body straight"
@@ -98,7 +97,7 @@ class PlankAnalyzer:
             else:
                 feedback = "Show full body side view in plank"
 
-        return output, {
+        return output_bgr, {
             "stage": "Plank Hold",
             "total_reps": self.completed_holds,
             "correct_reps": self.completed_holds,

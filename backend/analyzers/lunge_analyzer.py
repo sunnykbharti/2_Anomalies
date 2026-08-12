@@ -1,3 +1,4 @@
+import cv2
 import numpy as np
 from collections import deque
 from ultralytics import YOLO
@@ -7,9 +8,9 @@ LEFT_KNEE, RIGHT_KNEE = 13, 14
 LEFT_ANKLE, RIGHT_ANKLE = 15, 16
 LEFT_SHOULDER, RIGHT_SHOULDER = 5, 6
 
-KEYPOINT_CONFIDENCE_THRESHOLD = 0.50
+KEYPOINT_CONFIDENCE_THRESHOLD = 0.25
 STANDING_KNEE_THRESHOLD = 155.0
-LUNGE_DEPTH_THRESHOLD = 115.0
+LUNGE_DEPTH_THRESHOLD = 120.0
 SMOOTHING_WINDOW = 5
 
 
@@ -43,8 +44,10 @@ class LungeAnalyzer:
         self.rep_log = []
 
     def process_frame(self, frame):
-        results = self.model(frame, verbose=False)
-        output = results[0].plot()
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        results = self.model(frame_rgb, verbose=False)
+        output_rgb = results[0].plot()
+        output_bgr = cv2.cvtColor(output_rgb, cv2.COLOR_RGB2BGR)
 
         feedback = "No person detected"
         min_knee = None
@@ -58,25 +61,34 @@ class LungeAnalyzer:
             l_ank, r_ank = person[LEFT_ANKLE], person[RIGHT_ANKLE]
             l_sh, r_sh = person[LEFT_SHOULDER], person[RIGHT_SHOULDER]
 
-            important = [l_hip, r_hip, l_knee, r_knee, l_ank, r_ank, l_sh, r_sh]
-            reliable = all(p[2] > KEYPOINT_CONFIDENCE_THRESHOLD for p in important)
+            left_side_conf = min(l_hip[2], l_knee[2], l_ank[2], l_sh[2])
+            right_side_conf = min(r_hip[2], r_knee[2], r_ank[2], r_sh[2])
 
-            if reliable:
-                left_knee_angle = calculate_angle(l_hip[:2], l_knee[:2], l_ank[:2])
-                right_knee_angle = calculate_angle(r_hip[:2], r_knee[:2], r_ank[:2])
-                min_knee = min(left_knee_angle, right_knee_angle)
+            reliable_left = left_side_conf > KEYPOINT_CONFIDENCE_THRESHOLD
+            reliable_right = right_side_conf > KEYPOINT_CONFIDENCE_THRESHOLD
 
-                # Posture error checking: front knee passing way past ankle or leaning too forward
+            if reliable_left or reliable_right:
+                knee_angles = []
+                if reliable_left:
+                    knee_angles.append(calculate_angle(l_hip[:2], l_knee[:2], l_ank[:2]))
+                if reliable_right:
+                    knee_angles.append(calculate_angle(r_hip[:2], r_knee[:2], r_ank[:2]))
+
+                min_knee = float(np.min(knee_angles))
+
                 frame_errors = set()
-                torso_lean = abs(l_sh[0] - l_hip[0])
-                if torso_lean > 60:
+                sh = l_sh if left_side_conf >= right_side_conf else r_sh
+                hp = l_hip if left_side_conf >= right_side_conf else r_hip
+
+                torso_lean = abs(sh[0] - hp[0])
+                if torso_lean > 70:
                     frame_errors.add("leaning_forward")
 
                 feedback = self._run_state_machine(min_knee, frame_errors)
             else:
                 feedback = "Show full body in side view"
 
-        return output, {
+        return output_bgr, {
             "stage": self.stage,
             "total_reps": self.total_repetitions,
             "correct_reps": self.correct_repetitions,
