@@ -5,17 +5,17 @@ import api from "../api/Api";
 
 const Login = () => {
   const [showOtp, setShowOtp] = useState(false);
+  const [mobileNumber, setMobileNumber] = useState("");
 
   const navigate = useNavigate();
 
   const {
     register,
     handleSubmit,
-    getValues,
     formState: { errors },
   } = useForm();
 
-  // Send mobile number
+  // Step 1: Send mobile number
   const handleMobileSubmit = async (data) => {
     try {
       const response = await api.post("/login", {
@@ -24,6 +24,7 @@ const Login = () => {
 
       console.log(response.data);
 
+      setMobileNumber(data.mobile);
       setShowOtp(true);
 
       alert("OTP sent successfully");
@@ -37,11 +38,11 @@ const Login = () => {
     }
   };
 
-  // Verify OTP
+  // Step 2: Verify OTP
   const handleOtpSubmit = async (data) => {
     try {
       const response = await api.post("/login", {
-        mobile: getValues("mobile"),
+        mobile: mobileNumber,
         otp: data.otp,
       });
 
@@ -66,33 +67,25 @@ const Login = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
-
       <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
-
         {/* Header */}
         <div className="text-center mb-8">
-
           <h1 className="text-3xl font-bold text-gray-800">
             Nirmaya
           </h1>
-
           <p className="text-gray-500 mt-2">
             Login to access your health center
           </p>
-
         </div>
 
         {!showOtp ? (
-
           /* MOBILE FORM */
           <form onSubmit={handleSubmit(handleMobileSubmit)}>
-
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Mobile Number
             </label>
 
             <div className="flex">
-
               <span className="flex items-center px-4 bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg text-gray-600">
                 +91
               </span>
@@ -104,13 +97,11 @@ const Login = () => {
                   required: "Mobile number is required",
                   pattern: {
                     value: /^[0-9]{10}$/,
-                    message:
-                      "Enter a valid 10-digit mobile number",
+                    message: "Enter a valid 10-digit mobile number",
                   },
                 })}
                 className="w-full px-4 py-3 border border-gray-300 rounded-r-lg outline-none focus:ring-2 focus:ring-blue-500"
               />
-
             </div>
 
             {errors.mobile && (
@@ -125,24 +116,17 @@ const Login = () => {
             >
               Send OTP
             </button>
-
           </form>
-
         ) : (
-
           /* OTP FORM */
           <form onSubmit={handleSubmit(handleOtpSubmit)}>
-
             <div className="text-center mb-6">
-
               <p className="text-gray-600">
                 OTP sent to
               </p>
-
               <p className="font-semibold text-gray-800">
-                +91 {getValues("mobile")}
+                +91 {mobileNumber}
               </p>
-
             </div>
 
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -180,15 +164,12 @@ const Login = () => {
             <button
               type="button"
               onClick={() => setShowOtp(false)}
-              className="w-full mt-3 text-blue-600"
+              className="w-full mt-3 text-blue-600 text-sm font-medium"
             >
               Change Mobile Number
             </button>
-
           </form>
-
         )}
-
       </div>
     </div>
   );
