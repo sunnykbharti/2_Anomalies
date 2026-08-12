@@ -11,7 +11,7 @@ auth_bp = Blueprint('auth', __name__)
 OTP_STORE = {}
 
 
-@auth_bp.route('/login', methods=['POST'])
+@auth_bp.route('/api/login', methods=['POST'])
 def login():
     data = request.get_json() or {}
     mobile = data.get('mobile')
@@ -29,7 +29,7 @@ def login():
         
         # Optionally auto-create a user if signing up on the fly, or reject unassigned numbers:
         if not user:
-            return jsonify({"message": "Mobile number not registered in the system"}), 4400
+            return jsonify({"message": "Mobile number not registered in the system"}), 404
 
         # Generate OTP (Hardcoded '123456' for development/testing)
         generated_otp = "123456"
