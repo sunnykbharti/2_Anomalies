@@ -64,6 +64,7 @@ def start_exercise():
     _active["running"] = True
     _active["frame_count"] = 0
     _active["last_ai_insight"] = None
+    _active["started_at"] = datetime.utcnow()
 
     return jsonify({"status": "started", "exercise": exercise_type})
 
@@ -185,11 +186,14 @@ def stop_exercise():
 
     # Save to database if user is logged in or for global history
     session_id = None
+    ended_at = datetime.utcnow()
+    started_at = _active.get("started_at") or ended_at
     try:
         session = MovementSession(
             user_id=int(user_id) if user_id and str(user_id).isdigit() else None,
             exercise_type=exercise_name,
-            ended_at=datetime.utcnow(),
+            started_at=started_at,
+            ended_at=ended_at,
             total_reps=summary["total_reps"],
             correct_reps=summary["correct_reps"],
             incorrect_reps=summary["incorrect_reps"],
@@ -209,6 +213,7 @@ def stop_exercise():
             ))
         db.session.commit()
         session_id = session.id
+        _active["started_at"] = None  # reset after saving
     except Exception as e:
         db.session.rollback()
         print(f"Session save warning: {e}")

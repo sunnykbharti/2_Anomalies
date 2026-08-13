@@ -44,9 +44,12 @@ app.register_blueprint(auth_bp)
 
 from routes.movement import movement_bp
 from routes.dashboard import dashboard_bp
+from routes.sessions import sessions_bp
 app.register_blueprint(movement_bp)
 app.register_blueprint(dashboard_bp)
+app.register_blueprint(sessions_bp)
 # duplicate registration removed
+
 
 # ============ CORS configuration =====================
 
