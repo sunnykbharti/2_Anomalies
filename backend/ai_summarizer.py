@@ -18,9 +18,20 @@ class AISummarizer:
         self.ollama_url = os.getenv("OLLAMA_URL", "http://localhost:11434/api/generate")
         self.ollama_model = os.getenv("OLLAMA_MODEL", "qwen2.5:latest")
         
-        self.cached_insight = {}
+        self.cached_insight = {}          # keyed by exercise_type
+        self.cached_accuracy = {}         # last accuracy when cache was written
         self.is_generating_live = False
         self.last_live_generate_time = 0
+
+    def _compute_form_quality(self, accuracy: float, issues: list) -> str:
+        """Derive form_quality deterministically from live metrics (never rely on stale AI value)."""
+        has_critical = bool(issues)
+        if accuracy >= 80 and not has_critical:
+            return "Optimal"
+        elif accuracy >= 50 or (accuracy >= 30 and not has_critical):
+            return "Needs Attention"
+        else:
+            return "Critical Correction"
 
     def generate_live_feed_insight(self, exercise_type: str, metrics: dict, rep_history: list = None) -> dict:
         """
@@ -32,16 +43,25 @@ class AISummarizer:
         correct_reps = metrics.get("correct_reps", 0)
         incorrect_reps = metrics.get("incorrect_reps", 0)
         feedback = metrics.get("feedback", "")
-        
+        accuracy = metrics.get("accuracy", 0.0)
+        issues = metrics.get("issues", [])
+
         rep_history = rep_history or []
         recent_errors = []
         for rep in rep_history[-3:]:
             if isinstance(rep, dict) and "errors" in rep:
                 recent_errors.extend(rep.get("errors", []))
 
+        # Invalidate cache if accuracy shifted significantly (>15 pp) since last generation
+        cached_acc = self.cached_accuracy.get(exercise_type)
+        accuracy_shifted = cached_acc is not None and abs(accuracy - cached_acc) > 15
+
         # Check if we should launch background Ollama AI generation
         now = time.time()
-        if not self.is_generating_live and (now - self.last_live_generate_time > 2.0):
+        if not self.is_generating_live and (now - self.last_live_generate_time > 2.5 or accuracy_shifted):
+            if accuracy_shifted:
+                # Invalidate stale cache immediately so wrong text isn't shown
+                self.cached_insight.pop(exercise_type, None)
             self.is_generating_live = True
             threading.Thread(
                 target=self._async_ollama_live_worker,
@@ -49,12 +69,14 @@ class AISummarizer:
                 daemon=True
             ).start()
 
-        # If Ollama has generated an insight, return it!
+        # Return cached insight with live metric overrides
         if self.cached_insight.get(exercise_type):
             res = dict(self.cached_insight[exercise_type])
             res["stage"] = stage
             res["total_reps"] = total_reps
-            res["accuracy"] = metrics.get("accuracy", 0.0)
+            res["accuracy"] = accuracy
+            # Always recompute form_quality from live metrics — never use stale AI value
+            res["form_quality"] = self._compute_form_quality(accuracy, issues)
             return res
 
         # Check if Gemini API key exists as secondary option
@@ -62,18 +84,26 @@ class AISummarizer:
             try:
                 insight = self._call_gemini_live_insight(exercise_type, metrics, recent_errors)
                 if insight:
+                    insight["form_quality"] = self._compute_form_quality(accuracy, issues)
                     return insight
             except Exception as e:
                 print(f"[AISummarizer] Gemini Live API call error: {e}")
 
-        # Local Intelligent AI Fallback Engine
-        return self._build_local_live_insight(exercise_type, total_reps, correct_reps, incorrect_reps, stage, feedback, recent_errors)
+        # Local Intelligent AI Fallback Engine — pass both rep errors and active issues
+        all_errors_for_fallback = list(set(recent_errors + issues))
+        local = self._build_local_live_insight(exercise_type, total_reps, correct_reps, incorrect_reps, stage, feedback, all_errors_for_fallback)
+        local["form_quality"] = self._compute_form_quality(accuracy, issues)
+        return local
 
     def _async_ollama_live_worker(self, exercise_type: str, metrics: dict, recent_errors: list):
         try:
             insight = self._call_ollama_live_insight(exercise_type, metrics, recent_errors)
             if insight:
+                accuracy = metrics.get("accuracy", 0.0)
+                issues = metrics.get("issues", [])
+                insight["form_quality"] = self._compute_form_quality(accuracy, issues)
                 self.cached_insight[exercise_type] = insight
+                self.cached_accuracy[exercise_type] = accuracy
         except Exception as e:
             print(f"[AISummarizer] Async Ollama worker error: {e}")
         finally:
@@ -129,20 +159,34 @@ class AISummarizer:
 
         err_list = recent_errors if recent_errors else issues
 
+        if accuracy >= 80 and not err_list:
+            tone_instruction = "Be encouraging and praise the user — their form is great."
+        elif accuracy >= 50:
+            tone_instruction = "Be constructive and motivating — briefly acknowledge effort but clearly name the error and how to fix it."
+        else:
+            tone_instruction = (
+                f"IMPORTANT: Accuracy is critically low at {accuracy}%. "
+                f"DO NOT say 'excellent', 'great', 'perfect', or any positive words. "
+                f"Directly and politely describe the detected posture error and the exact correction needed."
+            )
+
         prompt = (
-            f"You are a polite, expert AI Biomechanics & Posture Coach analyzing real-time exercise feed telemetry.\n"
+            f"You are a friendly AI Fitness & Posture Coach giving REAL-TIME feedback in Hinglish "
+            f"(a natural casual mix of Hindi and English — like how Indian gym trainers actually speak).\n"
+            f"Examples of Hinglish style: 'Knees thodi bahar rakho yaar!', 'Back straight karo — bilkul sahi!', "
+            f"'Core tight rakho aur breathe karo.', 'Posture kaafi achha hai, keep it up!'\n\n"
             f"Exercise/Mode: {exercise_type}\n"
             f"Current Stage: {metrics.get('stage')}\n"
             f"Posture Health Score: {score}/100\n"
             f"Accuracy Rate: {accuracy}%\n"
             f"Reps/Frames Stats: Total={total_reps}, Correct={correct_reps}, Incorrect={incorrect_reps}\n"
             f"Active Errors/Issues: {', '.join(err_list) if err_list else 'None'}\n\n"
-            f"Provide a JSON response with keys:\n"
-            f"1. 'summary': 1 sentence evaluation of current posture or movement quality in clear Hindi.\n"
-            f"2. 'coaching_tip': 1 specific, polite biomechanical correction or encouragement in clear Hindi.\n"
-            f"3. 'live_speech': 1 short voice phrase (4-8 words) in polite Hindi for Text-To-Speech guidance.\n"
-            f"4. 'form_quality': 'Optimal' (if accuracy > 80% and no critical errors), 'Needs Attention' (if accuracy 50-80% or minor errors), or 'Critical Correction' (if accuracy < 50% or severe errors).\n"
-            f"Respond ONLY with valid JSON."
+            f"Tone: {tone_instruction}\n\n"
+            f"Provide a JSON response with EXACTLY these keys:\n"
+            f"1. 'summary': 1 sentence Hinglish evaluation of current posture — must reflect actual accuracy and errors.\n"
+            f"2. 'coaching_tip': 1 specific Hinglish correction tip or encouragement (conversational, not formal).\n"
+            f"3. 'live_speech': 1 short Hinglish voice phrase (5-9 words) for Text-To-Speech — punchy and natural.\n"
+            f"Respond ONLY with valid JSON. No markdown, no extra text."
         )
 
         payload = {
@@ -164,7 +208,15 @@ class AISummarizer:
                 text_out = res_data.get("response", "").strip()
                 if text_out.startswith("```"):
                     text_out = text_out.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-                return json.loads(text_out)
+                try:
+                    return json.loads(text_out)
+                except json.JSONDecodeError:
+                    # Fallback: replace single quotes with double quotes and attempt parsing
+                    import ast
+                    try:
+                        return ast.literal_eval(text_out)
+                    except Exception:
+                        return None
         return None
 
     def _call_ollama_session_summary(self, exercise_type: str, summary_data: dict, all_errors: list, min_angles: list) -> dict:
@@ -174,18 +226,21 @@ class AISummarizer:
         incorrect_reps = summary_data.get("incorrect_reps", 0)
 
         prompt = (
-            f"You are an AI Clinical & Athletic Posture Specialist analyzing complete workout telemetry.\n"
+            f"You are a friendly AI Fitness & Posture Coach writing a post-session report in Hinglish "
+            f"(natural casual mix of Hindi and English, like Indian fitness trainers speak).\n"
+            f"Examples: 'Aaj ki session mein form kaafi solid thi!', 'Knees thodi bahar rakho next time', "
+            f"'Core engagement achha tha, keep it up!'\n\n"
             f"Exercise: {exercise_type.upper()}\n"
             f"Total Reps/Frames: {total_reps}, Correct: {correct_reps}, Incorrect: {incorrect_reps}\n"
             f"Accuracy: {accuracy}%\n"
             f"Observed posture errors: {all_errors}\n\n"
-            f"Provide a structured JSON response in refined Hindi with:\n"
-            f"1. 'headline': Eye-catching AI diagnostic headline.\n"
-            f"2. 'overview': Detailed natural language synthesis of movement quality and posture consistency.\n"
-            f"3. 'key_strengths': List of 2 strengths observed during session.\n"
-            f"4. 'areas_for_improvement': List of 2 critical corrections required.\n"
-            f"5. 'safety_note': Guidance on avoiding injury or strain.\n"
-            f"6. 'score_text': e.g. 'Grade A - उत्कृष्ट संतुलन' or 'Grade C - सुधार की आवश्यकता'\n"
+            f"Provide a structured JSON response in Hinglish with:\n"
+            f"1. 'headline': Short punchy session headline in Hinglish.\n"
+            f"2. 'overview': 2-3 sentence Hinglish summary of movement quality and posture.\n"
+            f"3. 'key_strengths': List of 2 Hinglish strengths from this session.\n"
+            f"4. 'areas_for_improvement': List of 2 Hinglish corrections for next time.\n"
+            f"5. 'safety_note': 1 Hinglish safety tip to avoid injury.\n"
+            f"6. 'score_text': e.g. 'Grade A - Ekdum solid form!' or 'Grade C - Thodi practice aur chahiye'\n"
             f"Respond ONLY with valid JSON."
         )
 
@@ -208,8 +263,15 @@ class AISummarizer:
                 text_out = res_data.get("response", "").strip()
                 if text_out.startswith("```"):
                     text_out = text_out.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-                res_json = json.loads(text_out)
-
+                try:
+                    res_json = json.loads(text_out)
+                except json.JSONDecodeError:
+                    # Fallback parsing for malformed JSON (e.g., single quotes)
+                    import ast
+                    try:
+                        res_json = ast.literal_eval(text_out)
+                    except Exception:
+                        return None
                 if "formatted_text" not in res_json:
                     res_json["formatted_text"] = (
                         f"🎯 **{res_json.get('headline', '')}**\n\n"
@@ -284,133 +346,134 @@ class AISummarizer:
     def _build_local_live_insight(self, exercise_type: str, total: int, correct: int, incorrect: int, stage: str, feedback: str, errors: list) -> dict:
         ex_name = exercise_type.replace("_", " ").title()
         
-        # Comprehensive exercise-specific optimal feedback library
+        # Comprehensive exercise-specific optimal feedback library (Hinglish)
         EXERCISE_OPTIMAL = {
             "squat": {
-                "summary": "उत्कृष्ट स्क्वाट फॉर्म! घुटनों और रीढ़ की हड्डी का संरेखण सही है।",
-                "coaching_tip": "बहुत बढ़िया! एड़ियों से ज़मीन को दबाते हुए ऊपर उठें और कोर टाइट रखें।",
-                "live_speech": "उत्कृष्ट स्क्वाट फॉर्म! एड़ियों के बल पर ऊपर उठें।",
+                "summary": "Squat form ekdum solid hai! Knees aur spine ka alignment perfect chal raha hai.",
+                "coaching_tip": "Heels se ground push karo aur core tight rakho — bahut badhiya!",
+                "live_speech": "Solid squat form! Heels se push karo.",
             },
             "pushup": {
-                "summary": "शानदार पुश-अप फॉर्म! सिर से पैरों तक शरीर एक सीधी रेखा में है।",
-                "coaching_tip": "कोहनियों को 45 डिग्री पर बनाए रखें और छाती को नियंत्रण के साथ नीचे लाएं।",
-                "live_speech": "शानदार पुश-अप! इसी तरह नियंत्रण बनाए रखें।",
+                "summary": "Push-up form kaafi achhi hai! Head se toes tak body ek seedhi line mein hai.",
+                "coaching_tip": "Elbows 45 degree pe rakho aur chest ko control ke saath neeche lao.",
+                "live_speech": "Great push-up! Control maintain karo.",
             },
             "plank": {
-                "summary": "उत्कृष्ट प्लैंक होल्ड! रीढ़ और कूल्हों का संतुलन मजबूत है।",
-                "coaching_tip": "कोर को कसकर रखें और सामान्य रूप से सांस लेते रहें।",
-                "live_speech": "मजबूत प्लैंक होल्ड! कोर को टाइट रखें।",
+                "summary": "Plank hold strong hai! Spine aur hips ka balance ekdum tight chal raha hai.",
+                "coaching_tip": "Core ko kasa ke rakho aur normally breathe karte raho.",
+                "live_speech": "Strong plank! Core tight rakho.",
             },
             "lunges": {
-                "summary": "उत्कृष्ट लंज पोज़िशन! आगे का घुटना 90 डिग्री पर स्थिर है।",
-                "coaching_tip": "धड़ को बिल्कुल सीधा रखें और संतुलन को केंद्र में बनाए रखें।",
-                "live_speech": "उत्कृष्ट लंज फॉर्म! संतुलन बनाए रखें।",
+                "summary": "Lunge position achhi hai! Front knee 90 degree pe stable hai.",
+                "coaching_tip": "Torso ko bilkul seedha rakho aur balance center mein maintain karo.",
+                "live_speech": "Great lunge form! Balance banaye rakho.",
             },
             "desk_posture": {
-                "summary": "उत्कृष्ट स्टडी पोज़! पीठ सीधी है, गर्दन तनावमुक्त है और स्क्रीन दूरी सुरक्षित है।",
-                "coaching_tip": "कंधों को ढीला रखें और रीढ़ को सहारा देकर बैठें ताकि लंबे समय तक थकान न हो।",
-                "live_speech": "उत्कृष्ट स्टडी पोज़! आपकी पीठ और गर्दन का संतुलन सही है।",
+                "summary": "Study posture ekdum sahi hai! Back straight, neck relaxed, screen distance safe hai.",
+                "coaching_tip": "Shoulders ko loose rakho aur spine ko support deke baitho — fatigue nahi hogi.",
+                "live_speech": "Great study posture! Back aur neck balanced hai.",
             },
             "posture": {
-                "summary": "उत्कृष्ट मुद्रा संतुलन! दोनों कंधे और धड़ बिल्कुल सीधे हैं।",
-                "coaching_tip": "वजन को दोनों पैरों पर समान रूप से वितरित रखें।",
-                "live_speech": "उत्कृष्ट मुद्रा संतुलन बना हुआ है।",
+                "summary": "Posture balance ekdum solid hai! Dono shoulders aur torso straight hain.",
+                "coaching_tip": "Weight dono paon pe equally distribute rakho.",
+                "live_speech": "Posture balance ekdum solid chal raha hai!",
             },
             "tree_pose": {
-                "summary": "वृक्षासन का बेहतरीन संतुलन! पैर की पकड़ और एकाग्रता मजबूत है।",
-                "coaching_tip": "दृष्टि को सामने किसी स्थिर बिंदु पर केंद्रित रखें और सांस सामान्य रखें।",
-                "live_speech": "वृक्षासन में बहुत सुंदर संतुलन!",
+                "summary": "Tree pose ka balance behtareen hai! Foot grip aur focus strong hai.",
+                "coaching_tip": "Kisi ek point pe gaze fix karo aur breathe normally karte raho.",
+                "live_speech": "Tree pose mein beautiful balance!",
             },
             "tadasana": {
-                "summary": "ताड़ासन की सही स्थिति! रीढ़ सीधी है और शरीर तना हुआ है।",
-                "coaching_tip": "सांस भरते हुए शरीर को ऊपर की ओर खींचें और पैरों को मजबूती से टिकाएं।",
-                "live_speech": "ताड़ासन की उत्कृष्ट मुद्रा!",
+                "summary": "Tadasana posture sahi hai! Spine straight aur body tall hai.",
+                "coaching_tip": "Breath lete waqt body ko upar ki taraf stretch karo aur feet firmly ground karo.",
+                "live_speech": "Tadasana posture ekdum achha!",
             },
             "warrior_two": {
-                "summary": "वीरभद्रासन में मजबूत स्थिरता! भुजाएं क्षैतिज रूप से फैली हुई हैं।",
-                "coaching_tip": "सामने वाले घुटने को 90 डिग्री पर मोड़ें और दृष्टि आगे की उंगलियों पर रखें।",
-                "live_speech": "वीरभद्रासन में उत्कृष्ट स्थिरता!",
+                "summary": "Warrior Two mein strong stability hai! Arms horizontal hain.",
+                "coaching_tip": "Front knee 90 degree pe rakho aur gaze front fingers pe rakho.",
+                "live_speech": "Warrior Two mein great stability!",
             },
             "triangle": {
-                "summary": "त्रिकोणासन का सुंदर खिंचाव! पैर और रीढ़ सही संरेखण में हैं।",
-                "coaching_tip": "छाती को सामने की ओर खुला रखें और ऊपर वाली बांह को सीधा तानें।",
-                "live_speech": "त्रिकोणासन का बहुत सुंदर खिंचाव!",
+                "summary": "Triangle pose ka stretch achha chal raha hai! Legs aur spine aligned hain.",
+                "coaching_tip": "Chest ko front ki taraf open rakho aur upper arm ko straight stretch karo.",
+                "live_speech": "Triangle pose ka beautiful stretch!",
             },
             "downward_dog": {
-                "summary": "अधोमुख श्वानासन की सही मुद्रा! हिप्स ऊपर उठे हैं और रीढ़ लंबी है।",
-                "coaching_tip": "हथेली से ज़मीन को दबाएं और एड़ियों को ज़मीन की ओर जाने दें।",
-                "live_speech": "अधोमुख श्वानासन का बेहतरीन खिंचाव!",
+                "summary": "Downward Dog posture sahi hai! Hips upar hain aur spine long hai.",
+                "coaching_tip": "Palms se ground push karo aur heels ko ground ki taraf jaane do.",
+                "live_speech": "Downward Dog ka behtareen stretch!",
             },
             "cobra": {
-                "summary": "भुजंगासन की उत्कृष्ट मुद्रा! छाती खुली हुई है और कंधे पीछे हैं।",
-                "coaching_tip": "कंधों को कानों से दूर रखें और रीढ़ के ऊपरी हिस्से से खिंचाव लें।",
-                "live_speech": "भुजंगासन की सुंदर मुद्रा!",
+                "summary": "Cobra pose ekdum achha hai! Chest open hai aur shoulders back hain.",
+                "coaching_tip": "Shoulders ko ears se door rakho aur upper spine se stretch lo.",
+                "live_speech": "Cobra pose beautiful lag raha hai!",
             },
             "suryanamaskar": {
-                "summary": "सूर्य नमस्कार का शानदार प्रवाह! गतियों में अच्छा संतुलन और लय है।",
-                "coaching_tip": "प्रत्येक आसन के साथ सांस के तालमेल पर ध्यान केंद्रित रखें।",
-                "live_speech": "सूर्य नमस्कार का उत्कृष्ट प्रवाह!",
+                "summary": "Surya Namaskar flow solid hai! Movements mein achha balance aur rhythm hai.",
+                "coaching_tip": "Har asana ke saath breath ka coordination maintain karo.",
+                "live_speech": "Surya Namaskar flow ekdum solid!",
             },
         }
 
-        if not errors:
-            form_quality = "Optimal"
+        # Compute accuracy from reps if not already available
+        computed_acc = round((correct / total * 100) if total > 0 else 0.0, 1)
+
+        # Determine corrective messages from errors list (errors is the issues list or rep errors)
+        has_errors = bool(errors)
+
+        # Build contextual correction hint from detected errors
+        unique_errs = list(set(errors))
+        err_desc = ", ".join([e.replace("_", " ") for e in unique_errs])
+
+        if has_errors:
+            if "knee_valgus" in unique_errs or "knees" in err_desc.lower():
+                coaching_tip = "Knees thodi bahar ki taraf rakho — joints pe unnecessary pressure mat dalo."
+                live_speech = "Knees thoda bahar ki taraf rakho!"
+            elif "slouch" in err_desc.lower() or "झुककर" in err_desc:
+                coaching_tip = "Back ko straight karo yaar — chair ki backrest ka support lo."
+                live_speech = "Back straight karo, jhukna mat!"
+            elif "neck" in err_desc.lower() or "गर्दन" in err_desc or "forward neck" in err_desc.lower():
+                coaching_tip = "Neck thodi peeche lao aur screen ko eye level pe rakho."
+                live_speech = "Neck peeche karo, screen eye level pe rakho!"
+            elif "shoulder" in err_desc.lower() or "कंधे" in err_desc:
+                coaching_tip = "Dono shoulders ek hi level pe seedhe rakho — ek side mat jhuko."
+                live_speech = "Shoulders ko equal level pe rakho!"
+            elif "screen" in err_desc.lower() or "स्क्रीन" in err_desc:
+                coaching_tip = "Screen se kam se kam 20 inch ki distance banao — aankhon ke liye zaroori hai."
+                live_speech = "Screen se thoda peeche hato!"
+            elif "hips_sagging" in unique_errs or "sagging" in err_desc:
+                coaching_tip = "Core muscles ko tight karo aur hips ko straight rakho — bilkul!"
+                live_speech = "Core tight karo, kamar mat jhukne do!"
+            elif "depth" in err_desc or "shallow" in err_desc:
+                coaching_tip = "Thodi aur depth lo — heels ko ground pe tika ke aur neeche jao."
+                live_speech = "Heels pe tik ke aur neeche jao!"
+            elif "elbow" in err_desc:
+                coaching_tip = "Elbows ko body ke paas rakho — shoulder pe sahi balance aayega."
+                live_speech = "Elbows thoda body ke paas rakho!"
+            else:
+                coaching_tip = f"{ex_name} mein pose ka balance thoda aur improve karo."
+                live_speech = f"{ex_name} mein apna pose balance improve karo!"
+
+            summary = f"AI ne {ex_name} mein issue detect kiya: {err_desc or 'pose imbalance'}. Please correct karo!"
+        else:
+            # No active issues — show optimal feedback
             opt_data = EXERCISE_OPTIMAL.get(exercise_type, {
-                "summary": f"लाइव AI ट्रैकिंग सक्रिय है। {ex_name} में आपका पोज़ संतुलन बहुत अच्छा है।",
-                "coaching_tip": "बहुत बढ़िया! पूरी प्रक्रिया के दौरान सांस की गति और संतुलन बनाए रखें।",
-                "live_speech": f"उत्कृष्ट {ex_name} फॉर्म! इसी तरह नियंत्रण बनाए रखें।",
+                "summary": f"Live AI tracking active hai. {ex_name} mein pose balance achha lag raha hai!",
+                "coaching_tip": "Bahut badhiya! Puri session mein breath aur balance maintain karo.",
+                "live_speech": f"{ex_name} form achha chal raha hai!",
             })
             summary = opt_data["summary"]
             coaching_tip = opt_data["coaching_tip"]
             live_speech = opt_data["live_speech"]
-        else:
-            form_quality = "Needs Attention"
-            unique_errs = list(set(errors))
-            err_desc = ", ".join([e.replace("_", " ") for e in unique_errs])
-            summary = f"लाइव AI ने {ex_name} के दौरान पोज़ में थोड़ा अंतर पाया: {err_desc}।"
-            
-            if "knee_valgus" in unique_errs or "knees_inward" in err_desc:
-                coaching_tip = "कृपया घुटनों को पैरों की सीध में थोड़ा बाहर की ओर रखें, जिससे जोड़ों पर अनावश्यक दबाव न पड़े।"
-                live_speech = "कृपया अपने घुटनों को थोड़ा बाहर की तरफ रखें।"
-            elif "slouching" in err_desc.lower() or "झुककर" in err_desc:
-                coaching_tip = "रीढ़ की हड्डी को सीधा रखें और कुर्सी की बैकस्टेस्ट का सहारा लें।"
-                live_speech = "कृपया अपनी पीठ को सीधा करके बैठें।"
-            elif "neck" in err_desc.lower() or "गर्दन" in err_desc:
-                coaching_tip = "गर्दन को थोड़ा पीछे लाएं और स्क्रीन को आंखों के स्तर (eye-level) पर रखें।"
-                live_speech = "कृपया अपनी गर्दन को थोड़ा पीछे की तरफ रखें।"
-            elif "shoulder" in err_desc.lower() or "कंधे" in err_desc:
-                coaching_tip = "दोनों कंधों को एक ही स्तर पर सीधा रखें, एक तरफ न झुकें।"
-                live_speech = "कृपया अपने दोनों कंधों को संतुलित रखें।"
-            elif "screen" in err_desc.lower() or "स्क्रीन" in err_desc or "close" in err_desc.lower():
-                coaching_tip = "स्क्रीन से कम से कम 20-24 इंच की दूरी बनाए रखें।"
-                live_speech = "कृपया स्क्रीन से थोड़ा पीछे हटकर बैठें।"
-            elif "hips_sagging" in unique_errs or "sagging" in err_desc:
-                coaching_tip = "कमर और हिप्स झुक रहे हैं, कोर मांसपेशियों को कसकर हिप्स को सीधा रखें।"
-                live_speech = "कमर को झुकने न दें, कोर को टाइट रखें।"
-            elif "hips_piked" in unique_errs or "piked" in err_desc:
-                coaching_tip = "हिप्स बहुत ऊपर उठे हैं, शरीर को कंधों और एड़ियों की सीध में सीधा करें।"
-                live_speech = "हिप्स को थोड़ा नीचे लाएं, शरीर सीधा रखें।"
-            elif "depth" in err_desc or "shallow" in err_desc:
-                coaching_tip = "धीरे-धीरे थोड़ा और गहराई तक जाने का प्रयास करें, और एड़ियों को जमीन पर टिकाए रखें।"
-                live_speech = "कृपया अपनी एड़ियों को टिकाते हुए थोड़ा और नीचे जाएँ।"
-            elif "elbow" in err_desc:
-                coaching_tip = "कोहनियों को शरीर के समीप रखें ताकि कंधों पर सही संतुलन बना रहे।"
-                live_speech = "कृपया कोहनियों को थोड़ा शरीर के पास रखें।"
-            else:
-                coaching_tip = f"कृपया {ex_name} के दौरान पोज़ का संतुलन थोड़ा और सुधारने का प्रयास करें।"
-                live_speech = f"कृपया {ex_name} में अपने पोज़ का संतुलन सुधारें।"
-
-        if incorrect > correct and total > 2:
-            form_quality = "Critical Correction"
 
         return {
             "summary": summary,
             "coaching_tip": coaching_tip,
             "live_speech": live_speech,
-            "form_quality": form_quality,
+            "form_quality": self._compute_form_quality(computed_acc, errors),
             "stage": stage,
             "total_reps": total,
-            "accuracy": round((correct / total * 100) if total > 0 else 100, 1),
+            "accuracy": computed_acc,
         }
 
     def _build_local_session_summary(self, exercise_type: str, total: int, correct: int, incorrect: int, accuracy: float, all_errors: list, min_angles: list) -> dict:

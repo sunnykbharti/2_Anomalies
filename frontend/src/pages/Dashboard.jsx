@@ -11,40 +11,50 @@ import {
   Trophy,
   ArrowUpRight,
 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { fetchDashboardSummary, fetchRecentPatients } from "../api/Api.jsx";
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  // Dummy data — later replace with backend API data
-  const stats = [
+  const [summary, setSummary] = useState(null);
+  const [recentPatients, setRecentPatients] = useState([]);
+
+  useEffect(() => {
+    fetchDashboardSummary().then(data => setSummary(data));
+    fetchRecentPatients().then(data => setRecentPatients(data));
+  }, []);
+
+  const stats = summary ? [
     {
-      title: "Exercises",
-      value: "24",
-      subtitle: "This month",
-      icon: Dumbbell,
+      title: "Total Patients",
+      value: String(summary.total_patients),
+      subtitle: "All time",
+      icon: Activity,
       color: "cyan",
     },
     {
-      title: "Total Reps",
-      value: "1,248",
-      subtitle: "+18% this week",
-      icon: Activity,
-      color: "blue",
-    },
-    {
-      title: "Calories",
-      value: "4,820",
-      subtitle: "Burned",
-      icon: Flame,
-      color: "orange",
-    },
-    {
-      title: "Accuracy",
-      value: "94%",
-      subtitle: "+6% improvement",
+      title: "Low Risk",
+      value: String(summary.risk_counts.low || 0),
+      subtitle: "Patients",
       icon: Target,
-      color: "purple",
+      color: "green",
     },
-  ];
+    {
+      title: "Medium Risk",
+      value: String(summary.risk_counts.medium || 0),
+      subtitle: "Patients",
+      icon: Target,
+      color: "yellow",
+    },
+    {
+      title: "High Risk",
+      value: String(summary.risk_counts.high || 0),
+      subtitle: "Patients",
+      icon: Target,
+      color: "red",
+    },
+  ] : [];
+
 
   const exercises = [
     {
@@ -503,45 +513,17 @@ const Dashboard = () => {
           </div>
 
 
-          <div className="grid gap-5 md:grid-cols-4">
-
-            <div>
-              <p className="text-xs text-slate-500">
-                Exercise
-              </p>
-              <p className="mt-1 font-bold">
-                Squats
-              </p>
+            <div className="grid gap-5 md:grid-cols-4">
+              {recentPatients.map((patient) => (
+                <div key={patient.id} className="space-y-1">
+                  <p className="text-xs text-slate-500">Patient</p>
+                  <p className="mt-1 font-bold">{patient.name}</p>
+                  <p className="text-xs text-slate-500">Age: {patient.age}</p>
+                  <p className="text-xs text-slate-500">Gender: {patient.gender}</p>
+                  <p className="text-xs text-slate-500">Village: {patient.village}</p>
+                </div>
+              ))}
             </div>
-
-            <div>
-              <p className="text-xs text-slate-500">
-                Repetitions
-              </p>
-              <p className="mt-1 font-bold">
-                45
-              </p>
-            </div>
-
-            <div>
-              <p className="text-xs text-slate-500">
-                Pose Accuracy
-              </p>
-              <p className="mt-1 font-bold text-green-400">
-                96%
-              </p>
-            </div>
-
-            <div>
-              <p className="text-xs text-slate-500">
-                Duration
-              </p>
-              <p className="mt-1 font-bold">
-                18 min
-              </p>
-            </div>
-
-          </div>
 
         </div>
 
