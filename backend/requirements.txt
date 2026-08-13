@@ -3,28 +3,28 @@
 # ============================================================
 
 # --- Web Framework ---
-Flask==3.0.2
-Werkzeug==3.1.8
+Flask
+Werkzeug
 
 # --- Flask Extensions ---
-Flask-SQLAlchemy==3.1.1      # ORM / DB
-Flask-CORS==6.0.5            # Cross-Origin Resource Sharing
-Flask-JWT-Extended==4.6.0    # JWT authentication
-Flask-Caching==2.1.0         # Cache (extension.py uses Cache())
+Flask-SQLAlchemy     # ORM / DB
+Flask-CORS           # Cross-Origin Resource Sharing
+Flask-JWT-Extended    # JWT authentication
+Flask-Caching         # Cache (extension.py uses Cache())
 
 # --- Database ---
-SQLAlchemy==2.0.49           # Core ORM (Flask-SQLAlchemy dependency)
+SQLAlchemy          # Core ORM (Flask-SQLAlchemy dependency)
 
 # --- Computer Vision & Pose Estimation ---
-opencv-python-headless==4.10.0.84   # cv2 – frame decode/encode (headless = no GUI)
-numpy==2.0.2                        # np arrays used by cv2 and analyzers
-ultralytics==8.4.58                 # YOLO pose model used in all analyzers
+opencv-python-headless   # cv2 – frame decode/encode (headless = no GUI)
+numpy                     # np arrays used by cv2 and analyzers
+ultralytics                 # YOLO pose model used in all analyzers
 
 # --- Security ---
-PyJWT==2.13.0                # JWT token encoding (Flask-JWT-Extended dependency)
+PyJWT                # JWT token encoding (Flask-JWT-Extended dependency)
 
 # --- Utilities ---
-python-dotenv==1.2.1         # os.getenv / .env file support
+python-dotenv         # os.getenv / .env file support
 
 # --- Production Server ---
-gunicorn==23.0.0             # WSGI server for deployment
+gunicorn            # WSGI server for deployment
