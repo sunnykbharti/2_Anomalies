@@ -1,5 +1,5 @@
 import os
-from flask import Flask, jsonify, redirect, url_for
+from flask import Flask, jsonify, redirect, url_for, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from models import db, User
 from flask_jwt_extended import JWTManager
@@ -8,10 +8,10 @@ from extension import cache
 # from flask_caching import Cache
 # from celery import Celery
 
-
+frontend_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '../frontend/dist'))
 # ============= App & config =========================
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder=frontend_folder, static_url_path='')
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///auratrek.sqlite'
 app.config['SECRET_KEY'] = 'supersecretkey'
@@ -59,9 +59,12 @@ CORS(app)
 
 # ============ Routes =====================
 
-@app.route('/')
-def home():
-    return jsonify({"status": "healthy", "message": "AuraTrek RESTful API is active."})
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve(path):
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
+    return send_from_directory(app.static_folder, 'index.html')
 
 # ============== Running app ===================
 if __name__ == "__main__":
