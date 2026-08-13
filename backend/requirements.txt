@@ -1,165 +1,30 @@
-absl-py==2.3.1
-altair==5.5.0
-altgraph
-amqp==5.3.1
-aniso8601==10.0.1
-astunparse==1.6.3
-async-timeout==5.0.1
-attrs==26.1.0
-awscli==1.44.87
-backports.tarfile==1.2.0
-beautifulsoup4==4.15.0
-bidict==0.23.1
-billiard==4.2.4
-blinker==1.7.0
-boto3==1.42.97
-botocore==1.42.97
-cachelib==0.9.0
-cachetools==6.2.6
-celery==5.3.6
-certifi==2026.5.20
-charset-normalizer==3.4.7
-checksumdir==1.3.0
-click==8.1.8
-click-didyoumean==0.3.1
-click-plugins==1.1.1.2
-click-repl==0.3.0
-colorama==0.4.6
-contourpy==1.3.0
-cv==1.0.0
-cycler==0.12.1
-deepface==0.0.100
-dnspython==2.7.0
-docker==3.4.0
-docker-pycreds==0.4.0
-docutils==0.19
-eventlet==0.40.4
-filelock==3.19.1
-fire==0.7.1
+# ============================================================
+# PostureTrek Backend – actual runtime dependencies only
+# ============================================================
+
+# --- Web Framework ---
 Flask==3.0.2
-Flask-Caching==2.1.0
-flask-cors==6.0.5
-Flask-JWT-Extended==4.6.0
-Flask-Login==0.6.3
-Flask-RESTful==0.3.10
-Flask-SocketIO==5.6.1
-Flask-SQLAlchemy==3.1.1
-flatbuffers==25.12.19
-fonttools==4.60.2
-fsspec==2025.10.0
-future
-gast==0.7.0
-gdown==5.2.2
-gitdb==4.0.12
-GitPython==3.1.50
-google-pasta==0.2.0
-greenlet==3.2.5
-grpcio==1.80.0
-gunicorn==23.0.0
-h11==0.16.0
-h5py==3.14.0
-idna==3.17
-importlib_metadata==8.7.1
-importlib_resources==6.5.2
-itsdangerous==2.2.0
-jaraco.classes==3.4.0
-jaraco.context==6.1.1
-Jinja2==3.1.6
-jmespath==1.1.0
-joblib==1.5.3
-jsonschema==4.25.1
-jsonschema-specifications==2025.9.1
-keras==3.10.0
-keyring==8.7
-keyrings.alt==5.0.2
-kiwisolver==1.4.7
-kombu==5.6.2
-lap==0.5.13
-libclang==18.1.1
-lightdsa==0.0.3
-lightecc==0.0.7
-lightphe==0.0.25
-macholib
-Markdown==3.9
-markdown-it-py==3.0.0
-MarkupSafe==3.0.3
-matplotlib==3.9.4
-mdurl==0.1.2
-ml_dtypes==0.5.4
-more-itertools==10.8.0
-mpmath==1.3.0
-mtcnn==0.1.1
-namex==0.1.0
-narwhals==2.21.0
-networkx==3.2.1
-numpy==2.0.2
-opencv-python-headless==4.10.0.84
-opt_einsum==3.4.0
-optree==0.19.1
-packaging==25.0
-pandas==2.3.3
-pillow==11.3.0
-polars==1.36.1
-polars-runtime-32==1.36.1
-prompt_toolkit==3.0.52
-protobuf==6.33.6
-psutil==7.2.2
-pyarrow==21.0.0
-pyasn1==0.6.3
-pydeck==0.9.2
-Pygments==2.20.0
-PyJWT==2.13.0
-pyparsing==3.3.2
-PySocks==1.7.1
-python-dateutil==2.9.0.post0
-python-dotenv==1.2.1
-python-engineio==4.13.4
-python-socketio==5.16.4
-pytz==2026.2
-PyYAML==6.0.3
-redis==5.0.2
-referencing==0.36.2
-reportlab==4.5.1
-requests==2.32.5
-retina-face==0.0.18
-rich==15.0.0
-rpds-py==0.27.1
-rsa==4.7.2
-ruamel.yaml==0.19.1
-s3transfer==0.16.1
-scikit-learn==1.6.1
-scipy==1.13.1
-simple-websocket==1.1.0
-six
-smmap==5.0.3
-soupsieve==2.8.4
-SQLAlchemy==2.0.49
-streamlit==1.50.0
-sympy==1.14.0
-tabulate==0.9.0
-tenacity==9.1.2
-tensorboard==2.20.0
-tensorboard-data-server==0.7.2
-tensorflow==2.20.0
-termcolor==3.1.0
-tf_keras==2.20.1
-threadpoolctl==3.6.0
-toml==0.10.2
-torch==2.8.0
-torchvision==0.23.0
-tornado==6.5.6
-tqdm==4.70.0
-typing_extensions==4.15.0
-tzdata==2026.2
-ultralytics==8.4.58
-ultralytics-thop==2.0.19
-urllib3==1.26.20
-vine==5.1.0
-voluptuous==0.16.0
-wcwidth==0.7.0
-websocket-client==1.9.0
 Werkzeug==3.1.8
-wrapt==2.3.0
-wsproto==1.2.0
-yolo==0.3.2
-zipp==3.23.1
+
+# --- Flask Extensions ---
+Flask-SQLAlchemy==3.1.1      # ORM / DB
+Flask-CORS==6.0.5            # Cross-Origin Resource Sharing
+Flask-JWT-Extended==4.6.0    # JWT authentication
+Flask-Caching==2.1.0         # Cache (extension.py uses Cache())
+
+# --- Database ---
+SQLAlchemy==2.0.49           # Core ORM (Flask-SQLAlchemy dependency)
+
+# --- Computer Vision & Pose Estimation ---
+opencv-python-headless==4.10.0.84   # cv2 – frame decode/encode (headless = no GUI)
+numpy==2.0.2                        # np arrays used by cv2 and analyzers
+ultralytics==8.4.58                 # YOLO pose model used in all analyzers
+
+# --- Security ---
+PyJWT==2.13.0                # JWT token encoding (Flask-JWT-Extended dependency)
+
+# --- Utilities ---
+python-dotenv==1.2.1         # os.getenv / .env file support
+
+# --- Production Server ---
+gunicorn==23.0.0             # WSGI server for deployment
