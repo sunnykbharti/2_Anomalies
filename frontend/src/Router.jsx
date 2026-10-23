@@ -4,6 +4,7 @@ import {
 } from "react-router-dom";
 
 import Login from "./pages/Login";
+import Register from "./pages/Register";
 import HomeLayout from "./layouts/HomeLayout";
 import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
@@ -31,6 +32,11 @@ const Router = () => {
     {
       path: "/login",
       element: <Login />,
+    },
+
+    {
+      path: "/register",
+      element: <Register />,
     },
 
     {

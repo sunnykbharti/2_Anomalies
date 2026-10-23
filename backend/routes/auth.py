@@ -211,6 +211,105 @@ def set_user_password():
 
 
 # ─────────────────────────────────────────────────────────
+# 6. REGISTRATION ENDPOINT
+# ─────────────────────────────────────────────────────────
+
+@auth_bp.route('/api/register', methods=['POST'])
+@limiter.limit("5 per minute; 20 per hour")
+def register():
+    """Register a new user account with phone, email, name, and password."""
+    data = request.get_json(silent=True) or {}
+    name = (data.get('name') or '').strip()
+    raw_mobile = str(data.get('mobile') or data.get('phone') or '').strip()
+    raw_email = str(data.get('email') or '').strip()
+    password = data.get('password')
+
+    if not name or len(name) < 2:
+        return jsonify({
+            "error": "Bad Request",
+            "message": "Full name must be at least 2 characters long."
+        }), 400
+
+    # Validate mobile
+    cleaned_phone = raw_mobile.replace('+91', '').replace('-', '').replace(' ', '')
+    if not PHONE_REGEX.match(cleaned_phone):
+        return jsonify({
+            "error": "Bad Request",
+            "message": "Please enter a valid 10-digit mobile number."
+        }), 400
+
+    # Validate email
+    if not is_valid_email(raw_email):
+        return jsonify({
+            "error": "Bad Request",
+            "message": "Please enter a valid email address."
+        }), 400
+    email = raw_email.lower()
+
+    # Check for existing account conflicts
+    if User.query.filter_by(phone=cleaned_phone).first():
+        return jsonify({
+            "error": "Conflict",
+            "message": "An account with this mobile number already exists. Please log in."
+        }), 409
+
+    if User.query.filter_by(email=email).first():
+        return jsonify({
+            "error": "Conflict",
+            "message": "An account with this email address already exists. Please log in."
+        }), 409
+
+    # Validate password if provided
+    if password and len(password) < 6:
+        return jsonify({
+            "error": "Bad Request",
+            "message": "Password must be at least 6 characters long."
+        }), 400
+
+    new_user = User(
+        name=name,
+        phone=cleaned_phone,
+        email=email,
+        role='user'
+    )
+    if password:
+        new_user.set_password(password)
+
+    db.session.add(new_user)
+    db.session.commit()
+
+    # Generate and send welcome OTP verification code to registered email
+    raw_otp, _ = OtpVerification.create_otp(
+        identifier=email,
+        destination_email=email,
+        expiry_minutes=10
+    )
+    send_otp_email(
+        to_email=email,
+        otp_code=raw_otp,
+        user_name=name
+    )
+
+    # Issue JWT access token for immediate session creation
+    access_token = create_access_token(
+        identity=str(new_user.id),
+        additional_claims={
+            "role": new_user.role,
+            "name": new_user.name,
+            "phone": new_user.phone,
+            "email": new_user.email,
+        },
+        expires_delta=timedelta(days=7)
+    )
+
+    return jsonify({
+        "message": "Registration successful! Welcome to PostureTrek.",
+        "access_token": access_token,
+        "user": new_user.to_dict()
+    }), 201
+
+
+# ─────────────────────────────────────────────────────────
 # INTERNAL AUTH WORKERS
 # ─────────────────────────────────────────────────────────
 

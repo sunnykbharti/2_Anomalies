@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Activity,
   ArrowRight,
@@ -581,6 +581,17 @@ const Login = () => {
                 </form>
               </div>
             )}
+
+            {/* SWITCH TO REGISTER */}
+            <div className="mt-6 text-center text-xs text-slate-400">
+              Don&apos;t have an account?{" "}
+              <Link
+                to="/register"
+                className="font-bold text-cyan-400 hover:text-cyan-300 transition"
+              >
+                Create Account
+              </Link>
+            </div>
 
             {/* SECURITY BADGE */}
             <div className="mt-8 border-t border-white/5 pt-5 text-center">
