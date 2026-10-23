@@ -1,24 +1,56 @@
+"""
+routes/dashboard.py – User-scoped fitness analytics.
+Only returns real data belonging to the authenticated user.
+New users with no workout history receive zeroed metrics.
+"""
+
 from flask import Blueprint, jsonify
-from models import db, MovementSession, MovementRepLog
-from sqlalchemy import func
+from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
+from models import db, MovementSession
+from sqlalchemy import func, extract
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/api/dashboard')
 
 
+def _get_current_uid():
+    """Retrieve authenticated user ID, or None if unauthenticated."""
+    try:
+        verify_jwt_in_request(optional=True)
+        sub = get_jwt_identity()
+        if sub and str(sub).isdigit():
+            return int(sub)
+    except Exception:
+        pass
+    return None
+
+
 @dashboard_bp.route('/summary', methods=['GET'])
 def get_summary():
-    """Fitness summary stats for the dashboard."""
-    total_sessions = db.session.query(func.count(MovementSession.id)).scalar() or 0
+    """Fitness summary stats scoped strictly to the current user."""
+    uid = _get_current_uid()
 
-    total_reps = db.session.query(func.sum(MovementSession.total_reps)).scalar() or 0
-    correct_reps = db.session.query(func.sum(MovementSession.correct_reps)).scalar() or 0
+    # If unauthenticated or guest, return clean zero state
+    if uid is None:
+        return jsonify({
+            'total_sessions': 0,
+            'total_reps': 0,
+            'correct_reps': 0,
+            'avg_accuracy': 0.0,
+            'exercise_breakdown': {},
+        })
 
-    avg_accuracy = db.session.query(func.avg(MovementSession.accuracy)).scalar()
+    user_query = db.session.query(MovementSession).filter(MovementSession.user_id == uid)
+
+    total_sessions = user_query.with_entities(func.count(MovementSession.id)).scalar() or 0
+    total_reps = user_query.with_entities(func.sum(MovementSession.total_reps)).scalar() or 0
+    correct_reps = user_query.with_entities(func.sum(MovementSession.correct_reps)).scalar() or 0
+
+    avg_accuracy = user_query.with_entities(func.avg(MovementSession.accuracy)).scalar()
     avg_accuracy = round(avg_accuracy, 1) if avg_accuracy else 0.0
 
-    # Count sessions per exercise type
     exercise_counts = (
         db.session.query(MovementSession.exercise_type, func.count(MovementSession.id))
+        .filter(MovementSession.user_id == uid)
         .group_by(MovementSession.exercise_type)
         .all()
     )
@@ -35,9 +67,14 @@ def get_summary():
 
 @dashboard_bp.route('/recent_sessions', methods=['GET'])
 def get_recent_sessions():
-    """Return the 5 most recent workout sessions."""
+    """Return the 5 most recent workout sessions belonging to the current user."""
+    uid = _get_current_uid()
+    if uid is None:
+        return jsonify([])
+
     sessions = (
         db.session.query(MovementSession)
+        .filter(MovementSession.user_id == uid)
         .order_by(MovementSession.started_at.desc())
         .limit(5)
         .all()
@@ -60,20 +97,26 @@ def get_recent_sessions():
 
 @dashboard_bp.route('/weekly', methods=['GET'])
 def get_weekly_activity():
-    """Return rep counts grouped by day-of-week for a bar chart."""
-    from sqlalchemy import extract
+    """Return weekly rep counts for the current user grouped by day-of-week."""
+    day_names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    uid = _get_current_uid()
+
+    if uid is None:
+        return jsonify([{'day': d, 'reps': 0} for d in day_names])
+
+    # dow: 0=Sunday, 1=Monday … 6=Saturday
     rows = (
         db.session.query(
             extract('dow', MovementSession.started_at).label('dow'),
             func.sum(MovementSession.total_reps).label('reps')
         )
+        .filter(MovementSession.user_id == uid)
         .group_by('dow')
         .all()
     )
-    # dow: 0=Sunday … 6=Saturday
-    day_names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
     day_map = {int(r.dow): int(r.reps or 0) for r in rows}
-    result = [{'day': day_names[i], 'reps': day_map.get(i, 0)} for i in range(7)]
-    # Reorder Mon→Sun
-    result = result[1:] + result[:1]
+    # Re-map SQLite/Postgres DOW (0=Sun, 1=Mon, ..., 6=Sat) to Mon..Sun
+    ordered_dow = [1, 2, 3, 4, 5, 6, 0]
+    result = [{'day': day_names[i], 'reps': day_map.get(ordered_dow[i], 0)} for i in range(7)]
     return jsonify(result)

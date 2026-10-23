@@ -72,13 +72,16 @@ def _current_user_id():
 
 @sessions_bp.route('', methods=['GET'])
 def list_sessions():
-    """Return sessions for the authenticated user (or all if unauthenticated, for demo mode)."""
+    """Return sessions for the authenticated user only. Returns [] if unauthenticated."""
     uid = _current_user_id()
-    query = db.session.query(MovementSession).order_by(MovementSession.started_at.desc())
-    # fix #9: scope to the authenticated user's own sessions when logged in
-    if uid is not None:
-        query = query.filter(MovementSession.user_id == uid)
-    sessions = query.all()
+    if uid is None:
+        return jsonify([])
+    sessions = (
+        db.session.query(MovementSession)
+        .filter(MovementSession.user_id == uid)
+        .order_by(MovementSession.started_at.desc())
+        .all()
+    )
     return jsonify([_serialize(s) for s in sessions])
 
 

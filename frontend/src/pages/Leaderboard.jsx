@@ -1,88 +1,15 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import axios from "axios";
 import {
   Trophy,
   Medal,
   Award,
-  Crown,
   Flame,
   TrendingUp,
+  Dumbbell,
+  ArrowRight,
 } from "lucide-react";
-
-const DEMO_LEADERBOARD = [
-  {
-    rank: 1,
-    user_id: 101,
-    name: "Dr. Ananya Sharma",
-    role: "Doctor",
-    accuracy: 96.8,
-    correct_reps: 1240,
-    sessions_count: 34,
-    points: 13950,
-    badge: "🥇 Posture Master",
-    tier: "Gold",
-  },
-  {
-    rank: 2,
-    user_id: 102,
-    name: "Shreyansh Verma",
-    role: "Worker",
-    accuracy: 94.2,
-    correct_reps: 1105,
-    sessions_count: 29,
-    points: 12100,
-    badge: "🥈 Biomechanics Pro",
-    tier: "Silver",
-  },
-  {
-    rank: 3,
-    user_id: 103,
-    name: "Sunny Kumar",
-    role: "Worker",
-    accuracy: 91.5,
-    correct_reps: 980,
-    sessions_count: 25,
-    points: 10755,
-    badge: "🥉 Consistency Sentinel",
-    tier: "Bronze",
-  },
-  {
-    rank: 4,
-    user_id: 104,
-    name: "Priya Patel",
-    role: "Worker",
-    accuracy: 89.0,
-    correct_reps: 840,
-    sessions_count: 21,
-    points: 9265,
-    badge: "🌟 Elite Tracker",
-    tier: "Elite",
-  },
-  {
-    rank: 5,
-    user_id: 105,
-    name: "Rajesh Gupta",
-    role: "Doctor",
-    accuracy: 87.4,
-    correct_reps: 790,
-    sessions_count: 19,
-    points: 8717,
-    badge: "🌟 Elite Tracker",
-    tier: "Elite",
-  },
-  {
-    rank: 6,
-    user_id: 106,
-    name: "Kavita Singh",
-    role: "Worker",
-    accuracy: 85.2,
-    correct_reps: 650,
-    sessions_count: 16,
-    points: 7246,
-    badge: "🏅 Active Scholar",
-    tier: "Scholar",
-  },
-];
 
 const PERIODS = [
   { key: "daily",    label: "Daily" },
@@ -106,10 +33,10 @@ function rankBadgeCls(rank) {
 }
 
 const Leaderboard = () => {
-  const [period, setPeriod]               = useState("all_time");
-  const [leaderboard, setLeaderboard]     = useState(DEMO_LEADERBOARD);
+  const [period, setPeriod]                   = useState("all_time");
+  const [leaderboard, setLeaderboard]         = useState([]);
   const [currentUserRank, setCurrentUserRank] = useState(null);
-  const [loading, setLoading]             = useState(false);
+  const [loading, setLoading]                 = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -123,22 +50,24 @@ const Leaderboard = () => {
           { headers }
         );
         if (cancelled) return;
-        if (res.data?.leaderboard?.length > 0) {
+        if (res.data?.leaderboard && Array.isArray(res.data.leaderboard)) {
           setLeaderboard(res.data.leaderboard);
           setCurrentUserRank(res.data.current_user_rank || null);
         } else {
-          setLeaderboard(DEMO_LEADERBOARD);
+          setLeaderboard([]);
         }
       } catch (err) {
         if (!cancelled) {
-          console.warn("Leaderboard API error, using demo data:", err);
-          setLeaderboard(DEMO_LEADERBOARD);
+          console.error("Leaderboard fetch error:", err);
+          setLeaderboard([]);
         }
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [period]);
 
   const topThree = leaderboard.slice(0, 3);
@@ -151,7 +80,7 @@ const Leaderboard = () => {
         <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-3xl font-black tracking-tight md:text-4xl">Leaderboard</h1>
-            <p className="mt-1 text-slate-400">Top performers ranked by accuracy and points</p>
+            <p className="mt-1 text-slate-400">Community rankings based on real movement sessions</p>
           </div>
 
           {/* Period filter tabs */}
@@ -162,7 +91,7 @@ const Leaderboard = () => {
                 onClick={() => setPeriod(tab.key)}
                 className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
                   period === tab.key
-                    ? "bg-cyan-500 text-slate-950"
+                    ? "bg-cyan-500 text-slate-950 font-bold"
                     : "text-slate-400 hover:text-white"
                 }`}
               >
@@ -197,18 +126,39 @@ const Leaderboard = () => {
 
         {/* LOADING */}
         {loading && (
-          <div className="flex h-40 items-center justify-center">
-            <div className="h-7 w-7 animate-spin rounded-full border-2 border-white/10 border-t-cyan-400" />
+          <div className="flex h-60 items-center justify-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-cyan-400" />
           </div>
         )}
 
-        {!loading && (
+        {/* EMPTY STATE */}
+        {!loading && leaderboard.length === 0 && (
+          <div className="flex flex-col items-center justify-center rounded-3xl border border-white/10 bg-white/[0.02] p-12 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-cyan-400/10 text-cyan-400 mb-4 ring-1 ring-cyan-400/20">
+              <Trophy size={32} />
+            </div>
+            <h2 className="text-xl font-bold text-white">No Rankings Logged Yet</h2>
+            <p className="mt-2 max-w-md text-sm text-slate-400">
+              Be the first to claim the top spot! Complete any posture or exercise workout to establish your community rank.
+            </p>
+            <Link
+              to="/exercises"
+              className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 px-6 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:shadow-cyan-500/40"
+            >
+              <Dumbbell size={16} />
+              Start Workout <ArrowRight size={16} />
+            </Link>
+          </div>
+        )}
+
+        {/* LEADERBOARD DATA */}
+        {!loading && leaderboard.length > 0 && (
           <>
             {/* TOP 3 PODIUM */}
             {topThree.length >= 3 && (
               <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-3">
 
-                {/* 2nd Place — left */}
+                {/* 2nd Place */}
                 <div className="order-2 md:order-1 relative bg-white/[0.03] border border-white/[0.08] rounded-2xl p-6 text-center flex flex-col items-center gap-4">
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-slate-300 text-slate-900 text-sm font-extrabold">
                     2
@@ -218,7 +168,7 @@ const Leaderboard = () => {
                   </div>
                   <div>
                     <p className="font-bold text-white">{topThree[1]?.name}</p>
-                    <p className="mt-1 text-xs text-slate-400">{topThree[1]?.badge}</p>
+                    <p className="mt-1 text-xs text-slate-400">{topThree[1]?.badge || "Athlete"}</p>
                   </div>
                   <div className="w-full rounded-xl bg-black/20 border border-white/[0.05] p-3 text-sm space-y-1.5">
                     <div className="flex justify-between">
@@ -232,19 +182,19 @@ const Leaderboard = () => {
                   </div>
                 </div>
 
-                {/* 1st Place — centre, elevated */}
-                <div className="order-1 md:order-2 relative bg-white/[0.03] border border-amber-400/30 rounded-2xl p-6 text-center flex flex-col items-center gap-4 md:-translate-y-3 ring-1 ring-amber-400/20">
-                  <div className="absolute -top-5 left-1/2 -translate-x-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-amber-400 text-slate-950">
-                    <Crown size={20} />
+                {/* 1st Place */}
+                <div className="order-1 md:order-2 relative bg-gradient-to-b from-amber-400/10 to-white/[0.02] border border-amber-400/30 rounded-2xl p-6 text-center flex flex-col items-center gap-4 shadow-xl shadow-amber-400/5">
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-amber-400 text-slate-950 text-sm font-extrabold shadow-md">
+                    1
                   </div>
-                  <div className="mt-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-400/15 text-amber-300 border border-amber-400/30">
+                  <div className="mt-2 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-400/15 text-amber-300 border border-amber-400/30">
                     <Trophy size={32} />
                   </div>
                   <div>
-                    <p className="text-lg font-extrabold text-amber-200">{topThree[0]?.name}</p>
-                    <p className="mt-1 text-xs text-amber-400/80">{topThree[0]?.badge}</p>
+                    <p className="text-lg font-black text-white">{topThree[0]?.name}</p>
+                    <p className="mt-1 text-xs font-semibold text-amber-300">{topThree[0]?.badge || "Champion"}</p>
                   </div>
-                  <div className="w-full rounded-xl bg-black/30 border border-amber-400/10 p-3 text-sm space-y-1.5">
+                  <div className="w-full rounded-xl bg-black/30 border border-amber-400/20 p-3 text-sm space-y-1.5">
                     <div className="flex justify-between">
                       <span className="text-slate-400">Accuracy</span>
                       <span className="font-bold text-emerald-400">{topThree[0]?.accuracy}%</span>
@@ -256,7 +206,7 @@ const Leaderboard = () => {
                   </div>
                 </div>
 
-                {/* 3rd Place — right */}
+                {/* 3rd Place */}
                 <div className="order-3 relative bg-white/[0.03] border border-white/[0.08] rounded-2xl p-6 text-center flex flex-col items-center gap-4">
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-amber-700 text-slate-100 text-sm font-extrabold">
                     3
@@ -266,7 +216,7 @@ const Leaderboard = () => {
                   </div>
                   <div>
                     <p className="font-bold text-white">{topThree[2]?.name}</p>
-                    <p className="mt-1 text-xs text-slate-400">{topThree[2]?.badge}</p>
+                    <p className="mt-1 text-xs text-slate-400">{topThree[2]?.badge || "Athlete"}</p>
                   </div>
                   <div className="w-full rounded-xl bg-black/20 border border-white/[0.05] p-3 text-sm space-y-1.5">
                     <div className="flex justify-between">
@@ -288,9 +238,9 @@ const Leaderboard = () => {
               <div className="flex items-center justify-between border-b border-white/[0.08] px-6 py-4">
                 <div className="flex items-center gap-2">
                   <TrendingUp size={18} className="text-cyan-400" />
-                  <h2 className="font-bold">Full Standings</h2>
+                  <h2 className="font-bold">Standings</h2>
                 </div>
-                <span className="text-xs text-slate-500">Live ranking</span>
+                <span className="text-xs text-slate-500">Live rankings</span>
               </div>
 
               <div className="overflow-x-auto">
@@ -319,7 +269,7 @@ const Leaderboard = () => {
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-400/10 text-cyan-300 text-xs font-bold">
-                              {item.name.charAt(0)}
+                              {item.name?.charAt(0) || "U"}
                             </div>
                             <div>
                               <p className="font-semibold text-white">{item.name}</p>
@@ -339,7 +289,7 @@ const Leaderboard = () => {
                           {item.correct_reps}
                         </td>
                         <td className="px-6 py-4 text-right font-extrabold text-amber-300">
-                          {item.points.toLocaleString()} pts
+                          {item.points?.toLocaleString()} pts
                         </td>
                       </tr>
                     ))}

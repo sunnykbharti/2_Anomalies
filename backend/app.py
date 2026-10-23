@@ -83,17 +83,11 @@ _allowed_origins = os.getenv(
 ).split(',')
 CORS(app, origins=_allowed_origins, supports_credentials=True)
 
-# ── Database Init, Schema Auto-Migrate & Auto-Seed ───────────────────────────
-from seed import seed
-
+# ── Database Init & Schema Auto-Migrate ─────────────────────────────────────
 with app.app_context():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     # Automatically add missing columns/tables without losing existing data
     auto_migrate()
-    try:
-        seed()
-    except Exception as e:
-        logger.warning(f"Auto-seed notification: {e}")
 
 # ── Production Security Headers & Request ID ─────────────────────────────────
 @app.before_request

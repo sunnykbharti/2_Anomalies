@@ -415,10 +415,6 @@ const Login = () => {
                       </>
                     )}
                   </button>
-
-                  <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3 text-center text-[11px] text-slate-500">
-                    💡 Demo accounts: <span className="font-mono text-cyan-400">9876543210</span> (Arjun) or <span className="font-mono text-cyan-400">9876543211</span> (Priya)
-                  </div>
                 </form>
               </div>
             )}
@@ -574,10 +570,6 @@ const Login = () => {
                   >
                     {loading ? "Authenticating..." : "Sign In with Password"}
                   </button>
-
-                  <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3 text-center text-[11px] text-slate-500">
-                    💡 Demo password: <span className="font-mono text-cyan-400">PostureTrek@2026</span>
-                  </div>
                 </form>
               </div>
             )}
