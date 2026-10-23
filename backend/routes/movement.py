@@ -1,4 +1,5 @@
 import base64
+import secrets
 import numpy as np
 import cv2
 from datetime import datetime
@@ -6,6 +7,7 @@ from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity, verify_jwt_in_request
 
 from models import db, MovementSession, MovementRepLog
+from extensions import limiter
 from analyzers.squat_analyzer import SquatAnalyzer
 from analyzers.pushup_analyzer import PushupAnalyzer
 from analyzers.yoga_pose_analyzer import YogaAnalyzer
@@ -34,13 +36,25 @@ ANALYZERS = {
     "desk_posture": lambda: DeskPostureAnalyzer(),
 }
 
-_active = {
-    "exercise": None,
-    "analyzer": None,
-    "running": False,
-    "frame_count": 0,
-    "last_ai_insight": None,
-}
+# fix #5: per-session state keyed by a session token so concurrent users
+# don't overwrite each other's analyzer state.
+# Key: session_token (str)  Value: state dict (same shape as the old _active)
+_sessions: dict = {}
+
+def _new_session_state(exercise_type: str) -> dict:
+    return {
+        "exercise": exercise_type,
+        "analyzer": ANALYZERS[exercise_type](),
+        "running": True,
+        "frame_count": 0,
+        "last_ai_insight": None,
+        "last_had_issues": False,
+        "started_at": datetime.utcnow(),
+    }
+
+def _get_session_token() -> str:
+    """Extract X-Session-Token header, or fall back to a stable guest key."""
+    return request.headers.get("X-Session-Token") or "guest"
 
 
 @movement_bp.route('/start', methods=['POST'])
@@ -56,23 +70,20 @@ def start_exercise():
     exercise_type = data.get("exercise", "squat")
 
     if exercise_type not in ANALYZERS:
-        # Fallback to squat if unknown
         exercise_type = "squat"
 
-    _active["exercise"] = exercise_type
-    _active["analyzer"] = ANALYZERS[exercise_type]()
-    _active["running"] = True
-    _active["frame_count"] = 0
-    _active["last_ai_insight"] = None
-    _active["started_at"] = datetime.utcnow()
+    # fix #5: issue a session token and store state per-token
+    session_token = secrets.token_urlsafe(16)
+    _sessions[session_token] = _new_session_state(exercise_type)
 
-    return jsonify({"status": "started", "exercise": exercise_type})
+    return jsonify({"status": "started", "exercise": exercise_type, "session_token": session_token})
 
 
 @movement_bp.route('/analyze_frame', methods=['POST'])
+@limiter.limit("180 per minute")
 def analyze_frame():
     """Called repeatedly by frontend while analysis is running.
-    Body: {"image": "data:image/jpeg;base64,...."}
+    Body: {"image": "data:image/jpeg;base64,....", "session_token": "..."}
     Returns skeleton-annotated frame + live metrics + AI Live Feed Summary."""
     try:
         verify_jwt_in_request(optional=True)
@@ -81,15 +92,16 @@ def analyze_frame():
 
     data = request.get_json(silent=True) or {}
 
-    if not _active["running"] or _active["analyzer"] is None:
+    # fix #5: resolve session state from per-request token
+    session_token = data.get("session_token") or _get_session_token()
+    active = _sessions.get(session_token)
+
+    if not active or not active["running"] or active["analyzer"] is None:
         exercise_type = data.get("exercise", "squat")
         if exercise_type not in ANALYZERS:
             exercise_type = "squat"
-        _active["exercise"] = exercise_type
-        _active["analyzer"] = ANALYZERS[exercise_type]()
-        _active["running"] = True
-        _active["frame_count"] = 0
-        _active["last_ai_insight"] = None
+        active = _new_session_state(exercise_type)
+        _sessions[session_token] = active
 
     image_data_url = data.get("image")
     if not image_data_url:
@@ -106,8 +118,8 @@ def analyze_frame():
     if frame is None:
         return jsonify({"error": "empty frame"}), 400
 
-    output, metrics = _active["analyzer"].process_frame(frame)
-    _active["frame_count"] += 1
+    output, metrics = active["analyzer"].process_frame(frame)
+    active["frame_count"] += 1
 
     ok, buffer = cv2.imencode(".jpg", output, [cv2.IMWRITE_JPEG_QUALITY, 70])
     if not ok:
@@ -116,26 +128,26 @@ def analyze_frame():
     annotated_b64 = "data:image/jpeg;base64," + base64.b64encode(buffer).decode("utf-8")
 
     # Generate or update Live AI Feed Insight (throttled every 15 frames or issue change)
-    rep_log = getattr(_active["analyzer"], "rep_log", [])
+    rep_log = getattr(active["analyzer"], "rep_log", [])
     has_issues = bool(metrics.get("issues"))
-    last_had_issues = _active.get("last_had_issues", False)
-    _active["last_had_issues"] = has_issues
+    last_had_issues = active.get("last_had_issues", False)
+    active["last_had_issues"] = has_issues
 
     should_call_ai = (
-        _active["last_ai_insight"] is None or
-        _active["frame_count"] % 15 == 1 or
+        active["last_ai_insight"] is None or
+        active["frame_count"] % 15 == 1 or
         has_issues != last_had_issues
     )
 
     if should_call_ai:
         ai_insight = ai_summarizer.generate_live_feed_insight(
-            _active["exercise"],
+            active["exercise"],
             metrics,
             rep_log
         )
-        _active["last_ai_insight"] = ai_insight
+        active["last_ai_insight"] = ai_insight
     else:
-        ai_insight = _active["last_ai_insight"]
+        ai_insight = active["last_ai_insight"]
 
     # Ensure feedback field is AI-generated
     ai_feedback_text = ai_insight.get("live_speech") or ai_insight.get("coaching_tip") or metrics.get("feedback", "")
@@ -152,9 +164,11 @@ def analyze_frame():
 def live_ai_summary():
     """Generates an immediate on-demand AI summary for the active live feed."""
     data = request.get_json(silent=True) or {}
-    exercise = data.get("exercise", _active.get("exercise") or "squat")
+    session_token = data.get("session_token") or _get_session_token()
+    active = _sessions.get(session_token, {})
+    exercise = data.get("exercise", active.get("exercise") or "squat")
     metrics = data.get("metrics", {})
-    rep_log = getattr(_active.get("analyzer"), "rep_log", [])
+    rep_log = getattr(active.get("analyzer"), "rep_log", [])
 
     insight = ai_summarizer.generate_live_feed_insight(exercise, metrics, rep_log)
     return jsonify({"ai_live_summary": insight})
@@ -171,9 +185,14 @@ def stop_exercise():
         pass
 
     data = request.get_json(silent=True) or {}
-    analyzer = _active["analyzer"]
-    exercise_name = _active["exercise"] or "squat"
-    _active["running"] = False
+    session_token = data.get("session_token") or _get_session_token()
+    active = _sessions.pop(session_token, None)   # remove on stop to free memory
+
+    if active is None:
+        return jsonify({"error": "no session to stop"}), 400
+
+    analyzer = active["analyzer"]
+    exercise_name = active["exercise"] or "squat"
 
     if analyzer is None:
         return jsonify({"error": "no session to stop"}), 400
@@ -184,10 +203,10 @@ def stop_exercise():
     ai_report = ai_summarizer.generate_session_summary(exercise_name, summary)
     ai_summary_text = ai_report.get("formatted_text") or ai_report.get("overview") or _build_text_summary(summary)
 
-    # Save to database if user is logged in or for global history
+    # Save to database
     session_id = None
     ended_at = datetime.utcnow()
-    started_at = _active.get("started_at") or ended_at
+    started_at = active.get("started_at") or ended_at
     try:
         session = MovementSession(
             user_id=int(user_id) if user_id and str(user_id).isdigit() else None,
@@ -213,7 +232,6 @@ def stop_exercise():
             ))
         db.session.commit()
         session_id = session.id
-        _active["started_at"] = None  # reset after saving
     except Exception as e:
         db.session.rollback()
         print(f"Session save warning: {e}")

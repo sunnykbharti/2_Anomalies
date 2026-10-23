@@ -215,3 +215,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# SQLite databases — fix #3/#17: ignore the actual DB used by this project
+*.sqlite
+*.sqlite3
+backend/instance/

@@ -1,7 +1,7 @@
 """
-seed.py – PostureTrek demo data.
+seed.py – PostureTrek demo data with enterprise default passwords.
 
-Creates realistic users (with phone numbers) and
+Creates realistic users (with phone numbers and emails) and
 workout sessions with rep logs spread over the last 30 days.
 
 Run manually:   python3 seed.py
@@ -68,84 +68,97 @@ USERS_DATA = [
 
 
 def seed():
-    with app.app_context():
-        # Only seed if the DB is completely empty
-        if User.query.count() > 0:
-            print("[seed] Database already has data — skipping seed.")
-            return
+    # Only seed if the DB is completely empty
+    if User.query.count() > 0:
+        print("[seed] Database already has data — checking passwords.")
+        # Ensure existing demo users have a password set if missing
+        from werkzeug.security import generate_password_hash
+        users_without_pwd = User.query.filter(User.password_hash.is_(None)).all()
+        if users_without_pwd:
+            default_pwd = generate_password_hash("PostureTrek@2026", method='pbkdf2:sha256')
+            for u in users_without_pwd:
+                u.password_hash = default_pwd
+            db.session.commit()
+            print(f"[seed] Set default demo password (PostureTrek@2026) for {len(users_without_pwd)} users.")
+        return
 
-        print("[seed] Seeding PostureTrek demo data…")
+    print("[seed] Seeding PostureTrek demo data…")
 
-        now = datetime.utcnow()
-        users = []
+    now = datetime.utcnow()
+    users = []
 
-        # ── Create users ──────────────────────────────────────────────────
-        for u in USERS_DATA:
-            user = User(
-                name=u["name"],
-                phone=u["phone"],
-                email=u["email"],
-                password_hash=None,     # OTP-based login, no password needed
-                role='user',
+    from werkzeug.security import generate_password_hash
+    default_pwd_hash = generate_password_hash("PostureTrek@2026", method='pbkdf2:sha256')
+
+    # ── Create users ──────────────────────────────────────────────────
+    for u in USERS_DATA:
+        user = User(
+            name=u["name"],
+            phone=u["phone"],
+            email=u["email"],
+            password_hash=default_pwd_hash,     # Demo password: PostureTrek@2026
+            role='user',
+        )
+        db.session.add(user)
+        users.append(user)
+
+    db.session.commit()
+
+    # ── Create sessions + rep logs ───────────────────────────────────
+    for user in users:
+        num_sessions = random.randint(8, 15)
+
+        for _ in range(num_sessions):
+            exercise    = random.choice(EXERCISES)
+            days_ago    = random.randint(0, 30)
+            started     = now - timedelta(
+                days=days_ago,
+                hours=random.randint(6, 21),
+                minutes=random.randint(0, 59),
             )
-            db.session.add(user)
-            users.append(user)
+            duration    = timedelta(minutes=random.randint(5, 25))
+            ended       = started + duration
 
-        db.session.commit()
+            total       = random.randint(10, 40)
+            correct     = random.randint(int(total * 0.55), total)
+            incorrect   = total - correct
+            accuracy    = round((correct / total) * 100, 1)
+            ai_text     = random.choice(AI_SUMMARIES[exercise])
 
-        # ── Create sessions + rep logs ───────────────────────────────────
-        for user in users:
-            num_sessions = random.randint(8, 15)
+            session = MovementSession(
+                user_id=user.id,
+                exercise_type=exercise,
+                started_at=started,
+                ended_at=ended,
+                total_reps=total,
+                correct_reps=correct,
+                incorrect_reps=incorrect,
+                accuracy=accuracy,
+                ai_summary=ai_text,
+            )
+            db.session.add(session)
+            db.session.flush()   # get session.id
 
-            for _ in range(num_sessions):
-                exercise    = random.choice(EXERCISES)
-                days_ago    = random.randint(0, 30)
-                started     = now - timedelta(
-                    days=days_ago,
-                    hours=random.randint(6, 21),
-                    minutes=random.randint(0, 59),
-                )
-                duration    = timedelta(minutes=random.randint(5, 25))
-                ended       = started + duration
+            errors_pool = ERROR_MAP[exercise]
+            for rep_num in range(1, total + 1):
+                is_correct = rep_num <= correct
+                db.session.add(MovementRepLog(
+                    session_id=session.id,
+                    rep_number=rep_num,
+                    correct=is_correct,
+                    errors='' if is_correct else random.choice(errors_pool),
+                    min_angle=round(random.uniform(55, 130), 1),
+                    timestamp=started + timedelta(seconds=rep_num * random.randint(3, 8)),
+                ))
 
-                total       = random.randint(10, 40)
-                correct     = random.randint(int(total * 0.55), total)
-                incorrect   = total - correct
-                accuracy    = round((correct / total) * 100, 1)
-                ai_text     = random.choice(AI_SUMMARIES[exercise])
+        db.session.flush()
+        user.update_stats()     # populate cached stat columns on User
 
-                session = MovementSession(
-                    user_id=user.id,
-                    exercise_type=exercise,
-                    started_at=started,
-                    ended_at=ended,
-                    total_reps=total,
-                    correct_reps=correct,
-                    incorrect_reps=incorrect,
-                    accuracy=accuracy,
-                    ai_summary=ai_text,
-                )
-                db.session.add(session)
-                db.session.flush()   # get session.id
-
-                errors_pool = ERROR_MAP[exercise]
-                for rep_num in range(1, total + 1):
-                    is_correct = rep_num <= correct
-                    db.session.add(MovementRepLog(
-                        session_id=session.id,
-                        rep_number=rep_num,
-                        correct=is_correct,
-                        errors='' if is_correct else random.choice(errors_pool),
-                        min_angle=round(random.uniform(55, 130), 1),
-                        timestamp=started + timedelta(seconds=rep_num * random.randint(3, 8)),
-                    ))
-
-            db.session.flush()
-            user.update_stats()     # populate cached stat columns on User
-
-        db.session.commit()
-        print(f"[seed] Done — {len(users)} users, sessions + rep logs created.")
+    db.session.commit()
+    print(f"[seed] Done — {len(users)} users, sessions + rep logs created.")
 
 
 if __name__ == '__main__':
-    seed()
+    from app import app
+    with app.app_context():
+        seed()

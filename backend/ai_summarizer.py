@@ -17,10 +17,12 @@ class AISummarizer:
         self.api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         self.ollama_url = os.getenv("OLLAMA_URL", "http://localhost:11434/api/generate")
         self.ollama_model = os.getenv("OLLAMA_MODEL", "qwen2.5:latest")
-        
+
         self.cached_insight = {}          # keyed by exercise_type
         self.cached_accuracy = {}         # last accuracy when cache was written
-        self.is_generating_live = False
+        # fix #16: use a Lock instead of a bare boolean to prevent the race
+        # where two threads both pass the `if not self.is_generating_live` check.
+        self._generation_lock = threading.Lock()
         self.last_live_generate_time = 0
 
     def _compute_form_quality(self, accuracy: float, issues: list) -> str:
@@ -57,17 +59,19 @@ class AISummarizer:
         accuracy_shifted = cached_acc is not None and abs(accuracy - cached_acc) > 15
 
         # Check if we should launch background Ollama AI generation
+        # fix #16: acquire lock non-blocking to prevent duplicate background threads
         now = time.time()
-        if not self.is_generating_live and (now - self.last_live_generate_time > 2.5 or accuracy_shifted):
-            if accuracy_shifted:
-                # Invalidate stale cache immediately so wrong text isn't shown
-                self.cached_insight.pop(exercise_type, None)
-            self.is_generating_live = True
-            threading.Thread(
-                target=self._async_ollama_live_worker,
-                args=(exercise_type, metrics, recent_errors),
-                daemon=True
-            ).start()
+        if now - self.last_live_generate_time > 2.5 or accuracy_shifted:
+            if self._generation_lock.acquire(blocking=False):
+                if accuracy_shifted:
+                    # Invalidate stale cache immediately so wrong text isn't shown
+                    self.cached_insight.pop(exercise_type, None)
+                threading.Thread(
+                    target=self._async_ollama_live_worker,
+                    args=(exercise_type, metrics, recent_errors),
+                    daemon=True
+                ).start()
+            # If lock was not acquired, another thread is already generating — skip
 
         # Return cached insight with live metric overrides
         if self.cached_insight.get(exercise_type):
@@ -96,6 +100,7 @@ class AISummarizer:
         return local
 
     def _async_ollama_live_worker(self, exercise_type: str, metrics: dict, recent_errors: list):
+        # fix #16: lock is already held on entry; release it in the finally block
         try:
             insight = self._call_ollama_live_insight(exercise_type, metrics, recent_errors)
             if insight:
@@ -108,7 +113,7 @@ class AISummarizer:
             print(f"[AISummarizer] Async Ollama worker error: {e}")
         finally:
             self.last_live_generate_time = time.time()
-            self.is_generating_live = False
+            self._generation_lock.release()
 
     def generate_session_summary(self, exercise_type: str, summary_data: dict) -> dict:
         """

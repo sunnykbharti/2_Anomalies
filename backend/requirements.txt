@@ -11,14 +11,17 @@ Flask-SQLAlchemy     # ORM / DB
 Flask-CORS           # Cross-Origin Resource Sharing
 Flask-JWT-Extended    # JWT authentication
 Flask-Caching         # Cache (extension.py uses Cache())
+Flask-Limiter         # Enterprise rate limiting and DoS prevention
 
 # --- Database ---
 SQLAlchemy          # Core ORM (Flask-SQLAlchemy dependency)
 
 # --- Computer Vision & Pose Estimation ---
-opencv-python-headless   # cv2 – frame decode/encode (headless = no GUI)
+opencv-python-headless   # cv2 – frame decode/encode, Haar-cascade face detection
 numpy                     # np arrays used by cv2 and analyzers
 ultralytics                 # YOLO pose model used in all analyzers
+deepface                  # facial emotion recognition (7 basic emotions)
+tf-keras                  # keras backend required by deepface
 
 # --- Security ---
 PyJWT                # JWT token encoding (Flask-JWT-Extended dependency)

@@ -13,6 +13,7 @@ import Progress from "./pages/Progress";
 import Profile from "./pages/Profile";
 import Exercise from "./pages/Exercises";
 import Leaderboard from "./pages/Leaderboard";
+import EmotionDetection from "./pages/EmotionDetection";
 
 const Router = () => {
   const routes = createBrowserRouter([
@@ -65,6 +66,11 @@ const Router = () => {
     {
       path: "/profile",
       element: <Profile />,
+    },
+
+    {
+      path: "/emotion-detection",
+      element: <EmotionDetection />,
     },
   ]);
 

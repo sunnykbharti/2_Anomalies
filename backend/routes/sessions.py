@@ -6,6 +6,7 @@ The Sessions page expects:
   }
 """
 from flask import Blueprint, jsonify, request
+from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
 from models import db, MovementSession
 
 sessions_bp = Blueprint('sessions', __name__, url_prefix='/api/sessions')
@@ -59,14 +60,25 @@ def _serialize(s: MovementSession) -> dict:
 
 
 
+def _current_user_id():
+    """Return the authenticated user's integer id, or None for unauthenticated requests."""
+    try:
+        verify_jwt_in_request(optional=True)
+        uid = get_jwt_identity()
+        return int(uid) if uid and str(uid).isdigit() else None
+    except Exception:
+        return None
+
+
 @sessions_bp.route('', methods=['GET'])
 def list_sessions():
-    """Return all sessions ordered by most recent first."""
-    sessions = (
-        db.session.query(MovementSession)
-        .order_by(MovementSession.started_at.desc())
-        .all()
-    )
+    """Return sessions for the authenticated user (or all if unauthenticated, for demo mode)."""
+    uid = _current_user_id()
+    query = db.session.query(MovementSession).order_by(MovementSession.started_at.desc())
+    # fix #9: scope to the authenticated user's own sessions when logged in
+    if uid is not None:
+        query = query.filter(MovementSession.user_id == uid)
+    sessions = query.all()
     return jsonify([_serialize(s) for s in sessions])
 
 
@@ -75,6 +87,10 @@ def get_session(session_id):
     """Return a single session by ID."""
     s = db.session.get(MovementSession, session_id)
     if not s:
+        return jsonify({'error': 'Session not found'}), 404
+    # fix #10: only return the session if it belongs to the requesting user (when authenticated)
+    uid = _current_user_id()
+    if uid is not None and s.user_id != uid:
         return jsonify({'error': 'Session not found'}), 404
     return jsonify(_serialize(s))
 
@@ -85,6 +101,12 @@ def delete_session(session_id):
     s = db.session.get(MovementSession, session_id)
     if not s:
         return jsonify({'error': 'Session not found'}), 404
+    # fix #9 + #10: require authentication and ownership to delete
+    uid = _current_user_id()
+    if uid is None:
+        return jsonify({'error': 'Authentication required'}), 401
+    if s.user_id != uid:
+        return jsonify({'error': 'Not authorised to delete this session'}), 403
     db.session.delete(s)
     db.session.commit()
     return jsonify({'message': 'Session deleted successfully'})
